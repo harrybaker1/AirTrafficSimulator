@@ -1,12 +1,9 @@
 package edu.curtin.saed.assignment1;
 
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
-
 import edu.curtin.saed.assignment1.Plane.FlightStatus;
 import io.reactivex.rxjava3.disposables.Disposable;
-import io.reactivex.rxjava3.schedulers.Schedulers;
 import javafx.application.Platform;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
@@ -28,6 +25,7 @@ public class GUIManager {
     private Button endBtn;
     private Disposable planeSubscription;
     private Disposable airportListSubscription;
+    private Disposable logSubscription;
     private Map<Integer, GridAreaIcon> planeIcons;
     private SimulationManager simulationManager;
 
@@ -42,6 +40,9 @@ public class GUIManager {
 
         airportListSubscription = simulationManager.getAirportListSubject()
             .subscribe(airports -> Platform.runLater(() -> updateAirports(airports)), Throwable::printStackTrace);
+
+        logSubscription = simulationManager.getLogSubject()
+            .subscribe(message -> Platform.runLater(() -> logMessage(message)), Throwable::printStackTrace);
 
         simulationManager.loadSimulation();
     }
@@ -59,7 +60,6 @@ public class GUIManager {
         });
 
         endBtn.setOnAction(event -> {
-            System.out.println("End button pressed");
             endSimulation();
         });
 
@@ -70,7 +70,6 @@ public class GUIManager {
         statusText = new Label("Status: Ready");
         messageArea = new TextArea();
         messageArea.setEditable(false);
-        messageArea.appendText("Sidebar\nText\n");
 
         ToolBar toolbar = new ToolBar();
         toolbar.getItems().addAll(startBtn, endBtn, new Separator(), statusText);
@@ -139,12 +138,12 @@ public class GUIManager {
         });
     }
 
-    public void updateStatistics(int planesInFlight, int planesUnderService) {
-        Platform.runLater(() -> statusText.setText("In Flight: " + planesInFlight + ", Under Service: " + planesUnderService));
+    public void logMessage(String message) {
+        messageArea.appendText(message + "\n");
     }
 
-    public void displayMessage(String message) {
-        Platform.runLater(() -> messageArea.appendText(message + "\n"));
+    public void updateStatistics(int planesInFlight, int planesUnderService) {
+        Platform.runLater(() -> statusText.setText("In Flight: " + planesInFlight + ", Under Service: " + planesUnderService));
     }
 
     public void dispose() {

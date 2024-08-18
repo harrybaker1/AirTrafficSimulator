@@ -1,7 +1,6 @@
 package edu.curtin.saed.assignment1;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -24,6 +23,7 @@ public class SimulationManager {
     private List<FlightRequestHandler> flightRequestHandlerThreads;
     private PublishSubject<Plane> planeSubject;
     private PublishSubject<Map<Integer, Airport>> airportListSubject;
+    private PublishSubject<String> logSubject;
     private boolean isRunning;
 
 
@@ -34,6 +34,7 @@ public class SimulationManager {
         flightRequestHandlerThreads = new ArrayList<>();
         this.planeSubject = PublishSubject.create();
         this.airportListSubject = PublishSubject.create();
+        this.logSubject = PublishSubject.create();
         initAirports();
         initPlanes();
         initFlightRequestThreads();
@@ -97,7 +98,7 @@ public class SimulationManager {
     private void initFlightRequestThreads() {
         for (Airport airport : airports.values()) {
             FlightRequestProducer flightRequestProducer = new FlightRequestProducer(airport);
-            FlightRequestHandler flightRequestHandler = new FlightRequestHandler(airport, airports, planeTaskThreadPool, planeSubject);
+            FlightRequestHandler flightRequestHandler = new FlightRequestHandler(airport, airports, planeTaskThreadPool, planeSubject, logSubject);
     
             flightRequestProducerThreads.add(flightRequestProducer);
             flightRequestHandlerThreads.add(flightRequestHandler);
@@ -139,5 +140,9 @@ public class SimulationManager {
     
     public PublishSubject<Map<Integer, Airport>> getAirportListSubject() {
         return airportListSubject;
+    }
+
+    public PublishSubject<String> getLogSubject() {
+        return logSubject;
     }
 }

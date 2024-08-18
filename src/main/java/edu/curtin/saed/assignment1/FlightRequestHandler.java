@@ -15,12 +15,14 @@ public class FlightRequestHandler extends Thread {
     private Map<Integer, Airport> allAirports;
     private ThreadPoolExecutor planeTaskThreadPool;
     private PublishSubject<Plane> planeSubject;
+    private PublishSubject<String> logSubject;
 
-    public FlightRequestHandler(Airport airport, Map<Integer, Airport> allAirports, ThreadPoolExecutor planeTaskThreadPool, PublishSubject<Plane> planeSubject) {
+    public FlightRequestHandler(Airport airport, Map<Integer, Airport> allAirports, ThreadPoolExecutor planeTaskThreadPool, PublishSubject<Plane> planeSubject, PublishSubject<String> logSubject) {
         this.airport = airport;
         this.allAirports = allAirports;
         this.planeTaskThreadPool = planeTaskThreadPool;
         this.planeSubject = planeSubject;
+        this.logSubject = logSubject;
     }
 
     @Override
@@ -48,7 +50,7 @@ public class FlightRequestHandler extends Thread {
     }
 
     private class PlaneFlyingTask implements Runnable {
-        private static final long PLANE_UPDATE_TIME_MS = 100;
+        private static final long PLANE_UPDATE_TIME_MS = 25; //Increase if performance issues
         private Plane plane;
         private Airport destinationAirport;
         private ThreadPoolExecutor planeTaskThreadPool;
@@ -62,6 +64,7 @@ public class FlightRequestHandler extends Thread {
         @Override
         public void run() {
             plane.depart(destinationAirport);
+            logSubject.onNext("Plane " + plane.getId() + " departing Airport " + plane.getCurrentAirport().getId() + ".");
 
             long previousUpdateTime = System.currentTimeMillis();
 
@@ -82,7 +85,8 @@ public class FlightRequestHandler extends Thread {
                 }
             }
 
-            // After the flight ends, start the plane servicing task
+            logSubject.onNext("Plane " + plane.getId() + " arrived at Airport " + plane.getCurrentAirport().getId() + ".");
+
             PlaneServicingTask serviceTask = new PlaneServicingTask(plane);
             planeTaskThreadPool.execute(serviceTask);
         }
@@ -99,16 +103,10 @@ public class FlightRequestHandler extends Thread {
         @Override
         public void run() {
             try {
-                // Get the airport ID and plane ID
-                int airportId = plane.getCurrentAirport().getId();
-                int planeId = plane.getId();
-
-                // Start the saed_plane_service process with the airport ID and plane ID as arguments
                 Process proc = Runtime.getRuntime().exec(
-                    new String[]{"comms/bin/saed_plane_service", String.valueOf(airportId), String.valueOf(planeId)}
+                    new String[]{"comms/bin/saed_plane_service", String.valueOf(plane.getCurrentAirport().getId()), String.valueOf(plane.getId())}
                 );
 
-                // Capture the output of the process
                 BufferedReader br = new BufferedReader(new InputStreamReader(proc.getInputStream()));
                 String line;
                 StringBuilder output = new StringBuilder();

@@ -7,8 +7,6 @@ import javafx.stage.Stage;
 @SuppressWarnings("PMD")
 public class App extends Application
 {
-    private GUIManager guiManager;
-    private SimulationManager simulationManager;
     public static void main(String[] args)
     {
         launch();
@@ -17,7 +15,7 @@ public class App extends Application
     @Override
     public void start(Stage stage)
     {
-        simulationManager = new SimulationManager();
-        guiManager = new GUIManager(simulationManager, stage);
+        SimulationManager simulationManager = new SimulationManager();
+        GUIManager guiManager = new GUIManager(simulationManager, stage);
     }
 }
