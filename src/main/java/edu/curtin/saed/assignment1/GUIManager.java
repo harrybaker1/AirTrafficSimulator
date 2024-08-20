@@ -3,6 +3,7 @@ package edu.curtin.saed.assignment1;
 import java.util.HashMap;
 import java.util.Map;
 import edu.curtin.saed.assignment1.Plane.FlightStatus;
+import io.reactivex.rxjava3.disposables.CompositeDisposable;
 import io.reactivex.rxjava3.disposables.Disposable;
 import javafx.application.Platform;
 import javafx.scene.Scene;
@@ -23,9 +24,7 @@ public class GUIManager {
     private TextArea messageArea;
     private Button startBtn;
     private Button endBtn;
-    private Disposable planeSubscription;
-    private Disposable airportListSubscription;
-    private Disposable logSubscription;
+    private CompositeDisposable compositeDisposable;
     private Map<Integer, GridAreaIcon> planeIcons;
     private SimulationManager simulationManager;
 
@@ -33,60 +32,55 @@ public class GUIManager {
         this.simulationManager = simulationManager;
         this.stage = stage;
         planeIcons = new HashMap<>();
+        compositeDisposable = new CompositeDisposable();
         initComponents();
         
-        planeSubscription = simulationManager.getPlaneSubject()
-            .subscribe(plane -> Platform.runLater(() -> updatePlane(plane)), Throwable::printStackTrace);
+        compositeDisposable.add(simulationManager.getPlaneSubject()
+            .subscribe(plane -> Platform.runLater(() -> updatePlane(plane)), Throwable::printStackTrace));
 
-        airportListSubscription = simulationManager.getAirportListSubject()
-            .subscribe(airports -> Platform.runLater(() -> updateAirports(airports)), Throwable::printStackTrace);
+        compositeDisposable.add(simulationManager.getAirportListSubject()
+            .subscribe(airports -> Platform.runLater(() -> updateAirports(airports)), Throwable::printStackTrace));
+        
+        compositeDisposable.add(simulationManager.getLogSubject()
+            .subscribe(message -> Platform.runLater(() -> logMessage(message)), Throwable::printStackTrace));
 
-        logSubscription = simulationManager.getLogSubject()
-            .subscribe(message -> Platform.runLater(() -> logMessage(message)), Throwable::printStackTrace);
 
         simulationManager.loadSimulation();
     }
 
     private void initComponents() {
-        gridArea = new GridArea(SimulationManager.MAP_WIDTH, SimulationManager.MAP_HEIGHT);
-        gridArea.setStyle("-fx-background-color: #b8b8c2;");
+    gridArea = new GridArea(SimulationManager.MAP_WIDTH, SimulationManager.MAP_HEIGHT);
+    gridArea.setStyle("-fx-background-color: #b8b8c2;");
 
-        startBtn = new Button("Start");
-        endBtn = new Button("End");
-        endBtn.setDisable(true);
+    startBtn = new Button("Start");
+    endBtn = new Button("End");
+    endBtn.setDisable(true);
 
-        startBtn.setOnAction(event -> {
-            startSimulation();
-        });
+    startBtn.setOnAction(event -> startSimulation());
+    endBtn.setOnAction(event -> endSimulation());
+    stage.setOnCloseRequest(event -> endSimulation());
 
-        endBtn.setOnAction(event -> {
-            endSimulation();
-        });
+    statusText = new Label("Status: Ready");
+    messageArea = new TextArea();
+    messageArea.setEditable(false);
 
-        stage.setOnCloseRequest(event -> {
-            endSimulation();
-        });
+    ToolBar toolbar = new ToolBar();
+    toolbar.getItems().addAll(startBtn, endBtn, new Separator(), statusText);
 
-        statusText = new Label("Status: Ready");
-        messageArea = new TextArea();
-        messageArea.setEditable(false);
+    SplitPane splitPane = new SplitPane();
+    splitPane.getItems().addAll(gridArea, messageArea);
+    splitPane.setDividerPositions(0.75);
 
-        ToolBar toolbar = new ToolBar();
-        toolbar.getItems().addAll(startBtn, endBtn, new Separator(), statusText);
+    BorderPane contentPane = new BorderPane();
+    contentPane.setTop(toolbar);
+    contentPane.setCenter(splitPane);
 
-        SplitPane splitPane = new SplitPane();
-        splitPane.getItems().addAll(gridArea, messageArea);
-        splitPane.setDividerPositions(0.75);
+    Scene scene = new Scene(contentPane, 1200, 1000);
+    stage.setTitle("Air Traffic Simulator");
+    stage.setScene(scene);
+    stage.show();
+}
 
-        BorderPane contentPane = new BorderPane();
-        contentPane.setTop(toolbar);
-        contentPane.setCenter(splitPane);
-
-        Scene scene = new Scene(contentPane, 1200, 1000);
-        stage.setTitle("Air Traffic Simulator");
-        stage.setScene(scene);
-        stage.show();
-    }
 
     private void startSimulation() {
         startBtn.setDisable(true);
@@ -102,6 +96,7 @@ public class GUIManager {
         statusText.setText("Status: Stopped");
 
         simulationManager.endSimulation();
+        dispose();
     }
 
     private void updatePlane(Plane plane) {
@@ -147,11 +142,8 @@ public class GUIManager {
     }
 
     public void dispose() {
-        if (planeSubscription != null && !planeSubscription.isDisposed()) {
-            planeSubscription.dispose();
-        }
-        if (airportListSubscription != null && !airportListSubscription.isDisposed()) {
-            airportListSubscription.dispose();
+        if (compositeDisposable != null && !compositeDisposable.isDisposed()) {
+            compositeDisposable.dispose();
         }
     }
 }

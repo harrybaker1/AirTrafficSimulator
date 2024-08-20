@@ -25,7 +25,7 @@ public class FlightRequestProducer extends Thread {
             while ((line = br.readLine()) != null) {
                 try {
                     int destinationAirportId = Integer.parseInt(line);
-                    airport.addFlightRequest(destinationAirportId);
+                    airport.addFlightRequest(destinationAirportId + 1); //+1 as 0 indexing
                 } catch (NumberFormatException e) {
                     e.printStackTrace();
                 }

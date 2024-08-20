@@ -28,70 +28,76 @@ public class FlightRequestHandler extends Thread {
     @Override
     public void run() {
         try {
-            while (true) {
+            while (!Thread.currentThread().isInterrupted()) {
                 int destinationAirportId = airport.getFlightRequest();
                 Airport destinationAirport = getAirportById(destinationAirportId);
                 Plane plane = airport.getAvailablePlane();
                 PlaneFlyingTask movementTask = new PlaneFlyingTask(plane, destinationAirport, planeTaskThreadPool);
                 planeTaskThreadPool.execute(movementTask);
             }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
         } catch (Exception e) {
             e.printStackTrace();
         }
     }
 
     private Airport getAirportById(int airportId) {
-        for (Airport a : allAirports.values()) {
-            if (a.getId() == airportId) {
-                return a;
+        for (Airport airport : allAirports.values()) {
+            if (airport.getId() == airportId) {
+                return airport;
             }
         }
         return null;
     }
 
     private class PlaneFlyingTask implements Runnable {
-        private static final long PLANE_UPDATE_TIME_MS = 25; //Increase if performance issues
+        private static final long PLANE_UPDATE_INTERVAL_MS = 25; // Increase if performance issues
         private Plane plane;
         private Airport destinationAirport;
         private ThreadPoolExecutor planeTaskThreadPool;
-
+    
         public PlaneFlyingTask(Plane plane, Airport destinationAirport, ThreadPoolExecutor planeTaskThreadPool) {
             this.plane = plane;
             this.destinationAirport = destinationAirport;
             this.planeTaskThreadPool = planeTaskThreadPool;
         }
-
+    
         @Override
         public void run() {
-            plane.depart(destinationAirport);
+            plane.takeOff(destinationAirport);
             logSubject.onNext("Plane " + plane.getId() + " departing Airport " + plane.getCurrentAirport().getId() + ".");
-
+    
             long previousUpdateTime = System.currentTimeMillis();
-
+    
             while (plane.getFlightStatus() == FlightStatus.IN_FLIGHT) {
                 long currentTime = System.currentTimeMillis();
                 long deltaTime = currentTime - previousUpdateTime;
                 previousUpdateTime = currentTime;
-
-                plane.updatePosition(deltaTime);
-
-                planeSubject.onNext(plane);
-                
+    
+                boolean atDestination = plane.updatePosition(deltaTime);  // Access speed inside updatePosition
+                    
+                planeSubject.onNext(plane);  // Update GUI or other observers with the latest position
+    
+                if (atDestination) {
+                    break;
+                }
+    
                 try {
-                    Thread.sleep(PLANE_UPDATE_TIME_MS);
+                    Thread.sleep(PLANE_UPDATE_INTERVAL_MS);  // Pause the loop for a short period
                 } catch (InterruptedException e) {
                     e.printStackTrace();
                     break;
                 }
             }
-
-            logSubject.onNext("Plane " + plane.getId() + " arrived at Airport " + plane.getCurrentAirport().getId() + ".");
+            logSubject.onNext("Plane " + plane.getId() + " arrived at Airport " + plane.getDestinationAirport().getId() + ".");
+            plane.land();
 
             PlaneServicingTask serviceTask = new PlaneServicingTask(plane);
             planeTaskThreadPool.execute(serviceTask);
         }
     }
-
+    
 
     private class PlaneServicingTask implements Runnable {
         private Plane plane;
@@ -117,7 +123,9 @@ public class FlightRequestHandler extends Thread {
 
                 proc.waitFor();
 
-                plane.setFlightStatus(FlightStatus.READY);
+                logSubject.onNext(output.toString());
+
+                plane.serviced();
                 plane.getCurrentAirport().addAvailablePlane(plane);
 
             } catch (IOException e) {

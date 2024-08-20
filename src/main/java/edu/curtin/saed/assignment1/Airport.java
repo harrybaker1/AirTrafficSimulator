@@ -1,5 +1,6 @@
 package edu.curtin.saed.assignment1;
 
+import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 
@@ -16,7 +17,7 @@ public class Airport {
         this.xCoord = xCoord;
         this.yCoord = yCoord;
         this.availablePlanes = new LinkedBlockingQueue<>();
-        this.flightRequests = new LinkedBlockingQueue<>();
+        this.flightRequests = new ArrayBlockingQueue<>(SimulationManager.FLIGHT_REQUEST_QUEUE_LIMIT);
     }
 
     public int getId() {

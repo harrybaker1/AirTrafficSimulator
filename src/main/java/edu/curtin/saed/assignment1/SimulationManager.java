@@ -15,7 +15,9 @@ public class SimulationManager {
     public static final int MAP_WIDTH = 10;
     public static final int MAP_HEIGHT = 10;
     public static final int NUM_AIRPORTS = 10;
-    public static final int NUM_PLANES_PER_AIRPORT = 10;
+    public static final int NUM_PLANES_PER_AIRPORT = 2;
+    private static final double MIN_DIST_BETWEEN_AIPORTS = 1.5;
+    public static final int FLIGHT_REQUEST_QUEUE_LIMIT = 50;
     private ConcurrentHashMap<Integer, Airport> airports;
     private ConcurrentHashMap<Integer, Plane> planes;
     private ThreadPoolExecutor planeTaskThreadPool;
@@ -24,17 +26,23 @@ public class SimulationManager {
     private PublishSubject<Plane> planeSubject;
     private PublishSubject<Map<Integer, Airport>> airportListSubject;
     private PublishSubject<String> logSubject;
+    private int planesInFlight;
+    private int planesUnderService;
+    private int completedTrips;
     private boolean isRunning;
 
 
     public SimulationManager() {
         this.isRunning = false;
-        this.planeTaskThreadPool = (ThreadPoolExecutor) Executors.newFixedThreadPool(NUM_PLANES_PER_AIRPORT * NUM_AIRPORTS / 2);
+        this.planeTaskThreadPool = (ThreadPoolExecutor) Executors.newFixedThreadPool((NUM_PLANES_PER_AIRPORT * NUM_AIRPORTS) / 2);
         flightRequestProducerThreads = new ArrayList<>();
         flightRequestHandlerThreads = new ArrayList<>();
         this.planeSubject = PublishSubject.create();
         this.airportListSubject = PublishSubject.create();
         this.logSubject = PublishSubject.create();
+        planesInFlight = 0;
+        planesUnderService = 0;
+        completedTrips = 0;
         initAirports();
         initPlanes();
         initFlightRequestThreads();
@@ -49,12 +57,11 @@ public class SimulationManager {
 
     private void initAirports() {
         airports = new ConcurrentHashMap<>();
-        double minDistance = 1.5;
         int gridSize = (int) Math.ceil(Math.sqrt(NUM_AIRPORTS));
         double cellWidth = MAP_WIDTH / gridSize;
         double cellHeight = MAP_HEIGHT / gridSize;
     
-        for (int i = 0; i < NUM_AIRPORTS; i++) {
+        for (int i = 1; i <= NUM_AIRPORTS; i++) {
             double xCoord, yCoord;
             boolean validPosition;
     
@@ -72,7 +79,7 @@ public class SimulationManager {
                 // Check if this position is far enough from existing airports
                 for (Airport existingAirport : airports.values()) {
                     double distance = Math.hypot(xCoord - existingAirport.getXCoord(), yCoord - existingAirport.getYCoord());
-                    if (distance < minDistance) {
+                    if (distance < MIN_DIST_BETWEEN_AIPORTS) {
                         validPosition = false;
                         break;
                     }
@@ -85,11 +92,12 @@ public class SimulationManager {
 
     private void initPlanes() {
         planes = new ConcurrentHashMap<>();
-        int planeId = 0;
+        int planeId = 1;
+    
         for (Airport airport : airports.values()) {
             for (int i = 0; i < NUM_PLANES_PER_AIRPORT; i++) {
                 Plane plane = new Plane(planeId++, airport.getXCoord(), airport.getYCoord(), airport, FlightStatus.READY);
-                planes.put(i, plane);
+                planes.put(plane.getId(), plane);
                 airport.addAvailablePlane(plane);
             }
         }
