@@ -4,7 +4,6 @@ import java.util.HashMap;
 import java.util.Map;
 import edu.curtin.saed.assignment1.Plane.FlightStatus;
 import io.reactivex.rxjava3.disposables.CompositeDisposable;
-import io.reactivex.rxjava3.disposables.Disposable;
 import javafx.application.Platform;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
@@ -13,8 +12,13 @@ import javafx.scene.control.Separator;
 import javafx.scene.control.SplitPane;
 import javafx.scene.control.TextArea;
 import javafx.scene.control.ToolBar;
+import javafx.scene.image.Image;
 import javafx.scene.layout.BorderPane;
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.Priority;
+import javafx.scene.layout.Region;
 import javafx.stage.Stage;
+import javafx.scene.control.CheckBox;
 
 @SuppressWarnings("PMD")
 public class GUIManager {
@@ -24,6 +28,7 @@ public class GUIManager {
     private TextArea messageArea;
     private Button startBtn;
     private Button endBtn;
+    private CheckBox gridLinesCheckBox;
     private CompositeDisposable compositeDisposable;
     private Map<Integer, GridAreaIcon> planeIcons;
     private SimulationManager simulationManager;
@@ -34,7 +39,8 @@ public class GUIManager {
         planeIcons = new HashMap<>();
         compositeDisposable = new CompositeDisposable();
         initComponents();
-        
+
+        // Subscription to subjects
         compositeDisposable.add(simulationManager.getPlaneSubject()
             .subscribe(plane -> Platform.runLater(() -> updatePlane(plane)), Throwable::printStackTrace));
 
@@ -44,48 +50,63 @@ public class GUIManager {
         compositeDisposable.add(simulationManager.getLogSubject()
             .subscribe(message -> Platform.runLater(() -> logMessage(message)), Throwable::printStackTrace));
 
-
+        compositeDisposable.add(simulationManager.getStatsSubject()
+            .subscribe(stats -> Platform.runLater(() -> updateStatistics(stats)), Throwable::printStackTrace));
+        
         simulationManager.loadSimulation();
     }
 
     private void initComponents() {
-    gridArea = new GridArea(SimulationManager.MAP_WIDTH, SimulationManager.MAP_HEIGHT);
-    gridArea.setStyle("-fx-background-color: #b8b8c2;");
+        gridArea = new GridArea(SimulationManager.MAP_WIDTH, SimulationManager.MAP_HEIGHT);
+        gridArea.setStyle("-fx-background-color: #4CAF50;");
 
-    startBtn = new Button("Start");
-    endBtn = new Button("End");
-    endBtn.setDisable(true);
+        startBtn = new Button("Start");
+        endBtn = new Button("End");
+        endBtn.setDisable(true);
 
-    startBtn.setOnAction(event -> startSimulation());
-    endBtn.setOnAction(event -> endSimulation());
-    stage.setOnCloseRequest(event -> endSimulation());
+        gridLinesCheckBox = new CheckBox("Show Grid Lines");
+        gridLinesCheckBox.setSelected(true);
+        gridLinesCheckBox.setOnAction(event -> {
+            gridArea.setGridLines(gridLinesCheckBox.isSelected());
+            gridArea.requestLayout();
+        });
 
-    statusText = new Label("Status: Ready");
-    messageArea = new TextArea();
-    messageArea.setEditable(false);
+        startBtn.setOnAction(event -> startSimulation());
+        endBtn.setOnAction(event -> endSimulation());
+        stage.setOnCloseRequest(event -> endSimulation());
 
-    ToolBar toolbar = new ToolBar();
-    toolbar.getItems().addAll(startBtn, endBtn, new Separator(), statusText);
+        statusText = new Label("In Flight: 0" + 
+                           "\tUnder Service: 0" +
+                           "\tCompleted Trips: 0");
+        messageArea = new TextArea();
+        messageArea.setEditable(false);
+        messageArea.setWrapText(true);
 
-    SplitPane splitPane = new SplitPane();
-    splitPane.getItems().addAll(gridArea, messageArea);
-    splitPane.setDividerPositions(0.75);
+        ToolBar toolbar = new ToolBar();
+        Region spacer = new Region();
+        HBox.setHgrow(spacer, Priority.ALWAYS);
+        toolbar.getItems().addAll(startBtn, endBtn, new Separator(), gridLinesCheckBox, new Separator(), spacer, new Separator(), statusText);
 
-    BorderPane contentPane = new BorderPane();
-    contentPane.setTop(toolbar);
-    contentPane.setCenter(splitPane);
+        SplitPane splitPane = new SplitPane();
+        splitPane.getItems().addAll(gridArea, messageArea);
+        splitPane.setDividerPositions(0.71);
 
-    Scene scene = new Scene(contentPane, 1200, 1000);
-    stage.setTitle("Air Traffic Simulator");
-    stage.setScene(scene);
-    stage.show();
-}
 
+        BorderPane contentPane = new BorderPane();
+        contentPane.setTop(toolbar);
+        contentPane.setCenter(splitPane);
+
+        Scene scene = new Scene(contentPane, 1000, 1000);
+        stage.setTitle("Air Traffic Simulator");
+        Image icon = new Image(App.class.getClassLoader().getResourceAsStream("airport.png"));
+        stage.getIcons().add(icon);
+        stage.setScene(scene);
+        stage.show();
+    }
 
     private void startSimulation() {
         startBtn.setDisable(true);
         endBtn.setDisable(false);
-        statusText.setText("Status: Running");
 
         simulationManager.startSimulation();
     }
@@ -93,7 +114,6 @@ public class GUIManager {
     private void endSimulation() {
         endBtn.setDisable(true);
         startBtn.setDisable(false);
-        statusText.setText("Status: Stopped");
 
         simulationManager.endSimulation();
         dispose();
@@ -104,7 +124,7 @@ public class GUIManager {
             GridAreaIcon icon = planeIcons.get(plane.getId());
             if (icon == null) {
                 icon = new GridAreaIcon(
-                    plane.getXCoord(), plane.getYCoord(), plane.getDirection(), 0.1,
+                    plane.getXCoord(), plane.getYCoord(), plane.getDirection(), 0.7,
                     App.class.getClassLoader().getResourceAsStream("plane.png"),
                     String.valueOf(plane.getId()));
                 planeIcons.put(plane.getId(), icon);
@@ -137,8 +157,14 @@ public class GUIManager {
         messageArea.appendText(message + "\n");
     }
 
-    public void updateStatistics(int planesInFlight, int planesUnderService) {
-        Platform.runLater(() -> statusText.setText("In Flight: " + planesInFlight + ", Under Service: " + planesUnderService));
+    public void updateStatistics(Map<String, Integer> stats) {
+        int planesInFlight = stats.getOrDefault("planesInFlight", 0);
+        int planesUnderService = stats.getOrDefault("planesUnderService", 0);
+        int completedTrips = stats.getOrDefault("completedTrips", 0);
+        
+        statusText.setText("In Flight: " + planesInFlight + 
+                           "\tUnder Service: " + planesUnderService + 
+                           "\tCompleted Trips: " + completedTrips);
     }
 
     public void dispose() {

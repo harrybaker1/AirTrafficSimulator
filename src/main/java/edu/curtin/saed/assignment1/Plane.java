@@ -3,7 +3,7 @@ package edu.curtin.saed.assignment1;
 
 @SuppressWarnings("PMD")
 public class Plane {
-    private static double SPEED = 1.0;
+    private static double SPEED = 0.5;
     private int id;
     private double xCoord;
     private double yCoord;
@@ -78,7 +78,7 @@ public class Plane {
                 angleDegrees += 360;
             }
             
-            direction = angleDegrees + 90;
+            direction = angleDegrees + 45;
     
             return false;
         }

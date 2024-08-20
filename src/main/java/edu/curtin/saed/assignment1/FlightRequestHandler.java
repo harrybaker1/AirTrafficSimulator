@@ -16,13 +16,15 @@ public class FlightRequestHandler extends Thread {
     private ThreadPoolExecutor planeTaskThreadPool;
     private PublishSubject<Plane> planeSubject;
     private PublishSubject<String> logSubject;
+    private SimulationStatistics stats;
 
-    public FlightRequestHandler(Airport airport, Map<Integer, Airport> allAirports, ThreadPoolExecutor planeTaskThreadPool, PublishSubject<Plane> planeSubject, PublishSubject<String> logSubject) {
+    public FlightRequestHandler(Airport airport, Map<Integer, Airport> allAirports, ThreadPoolExecutor planeTaskThreadPool, PublishSubject<Plane> planeSubject, PublishSubject<String> logSubject, SimulationStatistics stats) {
         this.airport = airport;
         this.allAirports = allAirports;
         this.planeTaskThreadPool = planeTaskThreadPool;
         this.planeSubject = planeSubject;
         this.logSubject = logSubject;
+        this.stats = stats;
     }
 
     @Override
@@ -66,6 +68,7 @@ public class FlightRequestHandler extends Thread {
         @Override
         public void run() {
             plane.takeOff(destinationAirport);
+            stats.incrementPlanesInFlight();
             logSubject.onNext("Plane " + plane.getId() + " departing Airport " + plane.getCurrentAirport().getId() + ".");
     
             long previousUpdateTime = System.currentTimeMillis();
@@ -91,7 +94,11 @@ public class FlightRequestHandler extends Thread {
                 }
             }
             logSubject.onNext("Plane " + plane.getId() + " arrived at Airport " + plane.getDestinationAirport().getId() + ".");
+            
             plane.land();
+            stats.decrementPlanesInFlight();
+            stats.incrementCompletedTrips();
+            stats.incrementPlanesUnderService();
 
             PlaneServicingTask serviceTask = new PlaneServicingTask(plane);
             planeTaskThreadPool.execute(serviceTask);
@@ -123,9 +130,10 @@ public class FlightRequestHandler extends Thread {
 
                 proc.waitFor();
 
-                logSubject.onNext(output.toString());
+                logSubject.onNext(output.toString().replace("\n", "")); //Remove new lines
 
                 plane.serviced();
+                stats.decrementPlanesUnderService();
                 plane.getCurrentAirport().addAvailablePlane(plane);
 
             } catch (IOException e) {

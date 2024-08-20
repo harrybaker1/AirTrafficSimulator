@@ -101,7 +101,7 @@ public class GridArea extends Pane
         {
             // Draw the arena grid lines. This may help for debugging purposes, and just generally
             // to see what's going on.
-            gfx.setStroke(Color.BLACK);
+            gfx.setStroke(Color.WHITESMOKE);
 
             for(double gridX = 0.0; gridX < gridWidth; gridX++) // Internal vertical grid lines
             {
@@ -132,32 +132,30 @@ public class GridArea extends Pane
      */
     private void drawIcon(GraphicsContext gfx, GridAreaIcon icon)
     {
-        // Get the pixel coordinates representing the centre of where the image is to be drawn.
+        // Get the pixel coordinates representing the center of where the image is to be drawn.
         double x = (icon.getX() + 0.5) * gridSquareSize;
         double y = (icon.getY() + 0.5) * gridSquareSize;
 
-        // We also need to know how "big" to make the image. The image file has a natural width
-        // and height, but that's not necessarily the size we want to draw it on the screen. We
-        // do, however, want to preserve its aspect ratio.
+        // We also need to know how "big" to make the image.
         var image = icon.getImage();
         double fullSizePixelWidth = image.getWidth();
         double fullSizePixelHeight = image.getHeight();
 
+        // Apply scaling
+        double scale = icon.getScale();
+
         double displayedPixelWidth, displayedPixelHeight;
-        if(fullSizePixelWidth > fullSizePixelHeight)
+        if (fullSizePixelWidth > fullSizePixelHeight)
         {
-            // Here, the image is wider than it is high, so we'll display it such that it's as
-            // wide as a full grid cell, and the height will be set to preserve the aspect
-            // ratio.
-            displayedPixelWidth = gridSquareSize;
-            displayedPixelHeight = gridSquareSize * fullSizePixelHeight / fullSizePixelWidth;
+            // Image is wider than it is high
+            displayedPixelWidth = gridSquareSize * scale;
+            displayedPixelHeight = gridSquareSize * fullSizePixelHeight / fullSizePixelWidth * scale;
         }
         else
         {
-            // Otherwise, it's the other way around -- full height, and width is set to
-            // preserve the aspect ratio.
-            displayedPixelHeight = gridSquareSize;
-            displayedPixelWidth = gridSquareSize * fullSizePixelWidth / fullSizePixelHeight;
+            // Image is taller than it is wide
+            displayedPixelHeight = gridSquareSize * scale;
+            displayedPixelWidth = gridSquareSize * fullSizePixelWidth / fullSizePixelHeight * scale;
         }
 
         // Actually put the image on the screen.
@@ -176,6 +174,6 @@ public class GridArea extends Pane
         gfx.setTextAlign(TextAlignment.CENTER);
         gfx.setTextBaseline(VPos.TOP);
         gfx.setStroke(captionColour);
-        gfx.strokeText(icon.getCaption(), x, y + (gridSquareSize / 2.0));
+        gfx.strokeText(icon.getCaption(), x, y + (gridSquareSize / 2.0) * scale);  // Scale caption as well
     }
 }

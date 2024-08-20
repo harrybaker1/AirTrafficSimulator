@@ -1,21 +1,23 @@
 package edu.curtin.saed.assignment1;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import edu.curtin.saed.assignment1.Plane.FlightStatus;
 import io.reactivex.rxjava3.subjects.PublishSubject;
 
 @SuppressWarnings("PMD")
-public class SimulationManager {
+public class SimulationManager implements SimulationStatistics{
     public static final int MAP_WIDTH = 10;
     public static final int MAP_HEIGHT = 10;
     public static final int NUM_AIRPORTS = 10;
-    public static final int NUM_PLANES_PER_AIRPORT = 2;
+    public static final int NUM_PLANES_PER_AIRPORT = 1;
     private static final double MIN_DIST_BETWEEN_AIPORTS = 1.5;
     public static final int FLIGHT_REQUEST_QUEUE_LIMIT = 50;
     private ConcurrentHashMap<Integer, Airport> airports;
@@ -26,11 +28,11 @@ public class SimulationManager {
     private PublishSubject<Plane> planeSubject;
     private PublishSubject<Map<Integer, Airport>> airportListSubject;
     private PublishSubject<String> logSubject;
-    private int planesInFlight;
-    private int planesUnderService;
-    private int completedTrips;
+    private PublishSubject<Map<String, Integer>> statsSubject;
     private boolean isRunning;
-
+    private final AtomicInteger planesInFlight = new AtomicInteger(0);
+    private final AtomicInteger planesUnderService = new AtomicInteger(0);
+    private final AtomicInteger completedTrips = new AtomicInteger(0);
 
     public SimulationManager() {
         this.isRunning = false;
@@ -40,12 +42,11 @@ public class SimulationManager {
         this.planeSubject = PublishSubject.create();
         this.airportListSubject = PublishSubject.create();
         this.logSubject = PublishSubject.create();
-        planesInFlight = 0;
-        planesUnderService = 0;
-        completedTrips = 0;
+        this.statsSubject = PublishSubject.create();
         initAirports();
         initPlanes();
         initFlightRequestThreads();
+        emitStats();
     }
 
     public void loadSimulation() {
@@ -106,7 +107,7 @@ public class SimulationManager {
     private void initFlightRequestThreads() {
         for (Airport airport : airports.values()) {
             FlightRequestProducer flightRequestProducer = new FlightRequestProducer(airport);
-            FlightRequestHandler flightRequestHandler = new FlightRequestHandler(airport, airports, planeTaskThreadPool, planeSubject, logSubject);
+            FlightRequestHandler flightRequestHandler = new FlightRequestHandler(airport, airports, planeTaskThreadPool, planeSubject, logSubject, this);
     
             flightRequestProducerThreads.add(flightRequestProducer);
             flightRequestHandlerThreads.add(flightRequestHandler);
@@ -152,5 +153,47 @@ public class SimulationManager {
 
     public PublishSubject<String> getLogSubject() {
         return logSubject;
+    }
+
+    public PublishSubject<Map<String, Integer>> getStatsSubject() {
+        return statsSubject;
+    }
+
+    private void emitStats() {
+        Map<String, Integer> stats = new HashMap<>();
+        stats.put("planesInFlight", planesInFlight.get());
+        stats.put("planesUnderService", planesUnderService.get());
+        stats.put("completedTrips", completedTrips.get());
+        statsSubject.onNext(stats);
+    }
+
+    @Override
+    public void incrementPlanesInFlight() {
+        planesInFlight.incrementAndGet();
+        emitStats();
+    }
+
+    @Override
+    public void decrementPlanesInFlight() {
+        planesInFlight.decrementAndGet();
+        emitStats();
+    }
+
+    @Override
+    public void incrementPlanesUnderService() {
+        planesUnderService.incrementAndGet();
+        emitStats();
+    }
+
+    @Override
+    public void decrementPlanesUnderService() {
+        planesUnderService.decrementAndGet();
+        emitStats();
+    }
+
+    @Override
+    public void incrementCompletedTrips() {
+        completedTrips.incrementAndGet();
+        emitStats();
     }
 }
