@@ -1,10 +1,23 @@
+/**
+ * -----------------------------------------------------
+ * Airport.java
+ * -----------------------------------------------------
+ * Assignment 1
+ * Software Architecture and Extensible Design - COMP3003
+ * Curtin University
+ * 25/08/2024
+ * -----------------------------------------------------
+ * Harrison Baker
+ * 19514341
+ * -----------------------------------------------------
+ * */
+
 package edu.curtin.saed.assignment1;
 
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 
-@SuppressWarnings("PMD")
 public class Airport {
     private int id;
     private double xCoord;

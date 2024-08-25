@@ -1,3 +1,17 @@
+/**
+ * -----------------------------------------------------
+ * SimulationManager.java
+ * -----------------------------------------------------
+ * Assignment 1
+ * Software Architecture and Extensible Design - COMP3003
+ * Curtin University
+ * 25/08/2024
+ * -----------------------------------------------------
+ * Harrison Baker
+ * 19514341
+ * -----------------------------------------------------
+ * */
+
 package edu.curtin.saed.assignment1;
 
 import java.util.ArrayList;
@@ -12,16 +26,15 @@ import java.util.concurrent.atomic.AtomicInteger;
 import edu.curtin.saed.assignment1.Plane.FlightStatus;
 import io.reactivex.rxjava3.subjects.PublishSubject;
 
-@SuppressWarnings("PMD")
 public class SimulationManager implements SimulationStatistics{
     public static final int MAP_WIDTH = 10;
     public static final int MAP_HEIGHT = 10;
-    public static final int NUM_AIRPORTS = 10;
-    public static final int NUM_PLANES_PER_AIRPORT = 1;
     private static final double MIN_DIST_BETWEEN_AIPORTS = 1.5;
     public static final int FLIGHT_REQUEST_QUEUE_LIMIT = 50;
-    private ConcurrentHashMap<Integer, Airport> airports;
-    private ConcurrentHashMap<Integer, Plane> planes;
+    private Map<Integer, Airport> airports;
+    private Map<Integer, Plane> planes;
+    private int numAirports;
+    private int numPlanesPerAirport;
     private ThreadPoolExecutor planeTaskThreadPool;
     private List<FlightRequestProducer> flightRequestProducerThreads;
     private List<FlightRequestHandler> flightRequestHandlerThreads;
@@ -36,33 +49,31 @@ public class SimulationManager implements SimulationStatistics{
 
     public SimulationManager() {
         this.isRunning = false;
-        this.planeTaskThreadPool = (ThreadPoolExecutor) Executors.newFixedThreadPool((NUM_PLANES_PER_AIRPORT * NUM_AIRPORTS) / 2);
-        flightRequestProducerThreads = new ArrayList<>();
-        flightRequestHandlerThreads = new ArrayList<>();
+        this.flightRequestProducerThreads = new ArrayList<>();
+        this.flightRequestHandlerThreads = new ArrayList<>();
         this.planeSubject = PublishSubject.create();
         this.airportListSubject = PublishSubject.create();
         this.logSubject = PublishSubject.create();
         this.statsSubject = PublishSubject.create();
-        initAirports();
-        initPlanes();
-        initFlightRequestThreads();
-        emitStats();
     }
 
-    public void loadSimulation() {
-        airportListSubject.onNext(airports);
-        for(Plane plane : planes.values()) {
-            planeSubject.onNext(plane);   
-        }
+    public void loadSimulation(int numAirports, int numPlanesPerAirport, double planeSpeed) {
+        reset();
+        this.numAirports = numAirports;
+        this.numPlanesPerAirport = numPlanesPerAirport;
+        this.planeTaskThreadPool = (ThreadPoolExecutor) Executors.newFixedThreadPool(numAirports * numPlanesPerAirport);
+        initAirports();
+        initPlanes(planeSpeed);
+        initFlightRequestThreads();
     }
 
     private void initAirports() {
         airports = new ConcurrentHashMap<>();
-        int gridSize = (int) Math.ceil(Math.sqrt(NUM_AIRPORTS));
+        int gridSize = (int) Math.ceil(Math.sqrt(numAirports));
         double cellWidth = MAP_WIDTH / gridSize;
         double cellHeight = MAP_HEIGHT / gridSize;
     
-        for (int i = 1; i <= NUM_AIRPORTS; i++) {
+        for (int i = 1; i <= numAirports; i++) {
             double xCoord, yCoord;
             boolean validPosition;
     
@@ -72,8 +83,8 @@ public class SimulationManager implements SimulationStatistics{
                 int cellY = (int) (Math.random() * gridSize);
     
                 // Generate random position within the chosen cell
-                xCoord = cellX * cellWidth + Math.random() * cellWidth;
-                yCoord = cellY * cellHeight + Math.random() * cellHeight;
+                xCoord = Math.min(cellX * cellWidth + Math.random() * cellWidth, 9.0);
+                yCoord = Math.min(cellY * cellHeight + Math.random() * cellHeight, 9.0);
     
                 validPosition = true;
     
@@ -89,24 +100,26 @@ public class SimulationManager implements SimulationStatistics{
     
             airports.put(i, new Airport(i, xCoord, yCoord));
         }
+        airportListSubject.onNext(airports);
     }
 
-    private void initPlanes() {
+    private void initPlanes(double planeSpeed) {
         planes = new ConcurrentHashMap<>();
         int planeId = 1;
     
         for (Airport airport : airports.values()) {
-            for (int i = 0; i < NUM_PLANES_PER_AIRPORT; i++) {
-                Plane plane = new Plane(planeId++, airport.getXCoord(), airport.getYCoord(), airport, FlightStatus.READY);
+            for (int i = 0; i < numPlanesPerAirport; i++) {
+                Plane plane = new Plane(planeId++, airport.getXCoord(), airport.getYCoord(), planeSpeed, airport, FlightStatus.READY);
                 planes.put(plane.getId(), plane);
                 airport.addAvailablePlane(plane);
+                planeSubject.onNext(plane);
             }
         }
     }
 
     private void initFlightRequestThreads() {
         for (Airport airport : airports.values()) {
-            FlightRequestProducer flightRequestProducer = new FlightRequestProducer(airport);
+            FlightRequestProducer flightRequestProducer = new FlightRequestProducer(airport, numAirports);
             FlightRequestHandler flightRequestHandler = new FlightRequestHandler(airport, airports, planeTaskThreadPool, planeSubject, logSubject, this);
     
             flightRequestProducerThreads.add(flightRequestProducer);
@@ -142,6 +155,51 @@ public class SimulationManager implements SimulationStatistics{
             planeTaskThreadPool.shutdownNow();
         }
     }
+
+    public void reset() {
+        if (planeTaskThreadPool != null && !planeTaskThreadPool.isShutdown()) {
+            planeTaskThreadPool.shutdownNow();
+        }
+        
+        if (flightRequestProducerThreads != null) {
+            flightRequestProducerThreads.forEach(thread -> {
+                if (thread.isAlive()) {
+                    thread.interrupt();
+                }
+            });
+        }
+        
+        if (flightRequestHandlerThreads != null) {
+            flightRequestHandlerThreads.forEach(thread -> {
+                if (thread.isAlive()) {
+                    thread.interrupt();
+                }
+            });
+        }
+    
+        if (airports != null) {
+            airports.clear();
+        }
+        
+        if (planes != null) {
+            planes.clear();
+        }
+        
+        if (flightRequestProducerThreads != null) {
+            flightRequestProducerThreads.clear();
+        }
+        
+        if (flightRequestHandlerThreads != null) {
+            flightRequestHandlerThreads.clear();
+        }
+    
+        planesInFlight.set(0);
+        planesUnderService.set(0);
+        completedTrips.set(0);
+    
+        isRunning = false;
+    }
+    
     
     public PublishSubject<Plane> getPlaneSubject() {
         return planeSubject;

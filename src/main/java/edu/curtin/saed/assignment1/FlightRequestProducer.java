@@ -1,16 +1,34 @@
+/**
+ * -----------------------------------------------------
+ * FlightRequestProducer.java
+ * -----------------------------------------------------
+ * Assignment 1
+ * Software Architecture and Extensible Design - COMP3003
+ * Curtin University
+ * 25/08/2024
+ * -----------------------------------------------------
+ * Harrison Baker
+ * 19514341
+ * -----------------------------------------------------
+ * */
+
 package edu.curtin.saed.assignment1;
 
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
-@SuppressWarnings("PMD")
 public class FlightRequestProducer extends Thread {
-    private Airport airport;
+    private static final Logger LOGGER = Logger.getLogger(FlightRequestHandler.class.getName());
+    private final Airport airport;
+    private final int numAirports;
     private Process process;
-    
-    public FlightRequestProducer(Airport airport) {
+
+    public FlightRequestProducer(Airport airport, int numAirports) {
         this.airport = airport;
+        this.numAirports = numAirports;
     }
 
     @Override
@@ -18,28 +36,43 @@ public class FlightRequestProducer extends Thread {
         process = null;
         try {
             process = Runtime.getRuntime().exec(
-                new String[]{"saed_flight_requests", String.valueOf(SimulationManager.NUM_AIRPORTS), String.valueOf(airport.getId())});
+                new String[]{"saed_flight_requests", String.valueOf(numAirports), String.valueOf(airport.getId() - 1)});
             
-            BufferedReader br = new BufferedReader(new InputStreamReader(process.getInputStream()));
-            String line;
-            while ((line = br.readLine()) != null) {
-                try {
-                    int destinationAirportId = Integer.parseInt(line);
-                    airport.addFlightRequest(destinationAirportId + 1); //+1 as 0 indexing
-                } catch (NumberFormatException e) {
-                    e.printStackTrace();
+            try (BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
+                String line;
+                while ((line = bufferedReader.readLine()) != null) {
+                    try {
+                        int destinationAirportId = Integer.parseInt(line);
+                        airport.addFlightRequest(destinationAirportId + 1);
+                    } catch (NumberFormatException e) {
+                        LOGGER.log(Level.WARNING, () -> "Failed to parse destination airport ID: " + e.getMessage());
+                    }
                 }
             }
         } catch (IOException e) {
-            e.printStackTrace();
+            LOGGER.log(Level.WARNING, () -> "IOException occurred: " + e.getMessage());
         } finally {
             if (process != null) {
                 process.destroy();
+                try {
+                    process.waitFor(); // Ensure the process terminates
+                } catch (InterruptedException e) {
+                    LOGGER.log(Level.WARNING, () -> "Process was interrupted: " + e.getMessage());
+                    currentThread().interrupt(); // Handle the interruption
+                }
             }
         }
     }
 
     public void endProcess() {
-        process.destroy();
+        if (process != null) {
+            process.destroy();
+            try {
+                process.waitFor(); // Ensure the process terminates
+            } catch (InterruptedException e) {
+                LOGGER.log(Level.WARNING, () -> "Process was interrupted during endProcess: " + e.getMessage());
+                currentThread().interrupt(); // Handle the interruption
+            }
+        }
     }
 }

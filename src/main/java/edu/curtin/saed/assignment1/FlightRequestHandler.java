@@ -1,16 +1,34 @@
+/**
+ * -----------------------------------------------------
+ * FlightRequestHandler.java
+ * -----------------------------------------------------
+ * Assignment 1
+ * Software Architecture and Extensible Design - COMP3003
+ * Curtin University
+ * 25/08/2024
+ * -----------------------------------------------------
+ * Harrison Baker
+ * 19514341
+ * -----------------------------------------------------
+ * */
+
 package edu.curtin.saed.assignment1;
 
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.Map;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+import java.util.logging.Logger;
+import java.util.logging.Level;
 
 import edu.curtin.saed.assignment1.Plane.FlightStatus;
 import io.reactivex.rxjava3.subjects.PublishSubject;
-
-@SuppressWarnings("PMD")
 public class FlightRequestHandler extends Thread {
+    private static final Logger LOGGER = Logger.getLogger(FlightRequestHandler.class.getName());
     private Airport airport;
     private Map<Integer, Airport> allAirports;
     private ThreadPoolExecutor planeTaskThreadPool;
@@ -30,84 +48,68 @@ public class FlightRequestHandler extends Thread {
     @Override
     public void run() {
         try {
-            while (!Thread.currentThread().isInterrupted()) {
+            while (!currentThread().isInterrupted()) {
                 int destinationAirportId = airport.getFlightRequest();
                 Airport destinationAirport = getAirportById(destinationAirportId);
                 Plane plane = airport.getAvailablePlane();
-                PlaneFlyingTask movementTask = new PlaneFlyingTask(plane, destinationAirport, planeTaskThreadPool);
-                planeTaskThreadPool.execute(movementTask);
+                PlaneFlyingTask movementTask = new PlaneFlyingTask(plane, destinationAirport);
+                if (!planeTaskThreadPool.isShutdown()) {
+                    planeTaskThreadPool.execute(movementTask);
+                }
             }
         } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-        } catch (Exception e) {
-            e.printStackTrace();
+            LOGGER.log(Level.WARNING, () -> e.getMessage());
+            currentThread().interrupt();
         }
     }
 
     private Airport getAirportById(int airportId) {
-        for (Airport airport : allAirports.values()) {
-            if (airport.getId() == airportId) {
-                return airport;
-            }
-        }
-        return null;
+        return allAirports.getOrDefault(airportId, null);
     }
 
     private class PlaneFlyingTask implements Runnable {
-        private static final long PLANE_UPDATE_INTERVAL_MS = 25; // Increase if performance issues
+        private static final long PLANE_UPDATE_INTERVAL_MS = 50;
         private Plane plane;
         private Airport destinationAirport;
-        private ThreadPoolExecutor planeTaskThreadPool;
-    
-        public PlaneFlyingTask(Plane plane, Airport destinationAirport, ThreadPoolExecutor planeTaskThreadPool) {
+        private ScheduledExecutorService scheduler;
+
+        public PlaneFlyingTask(Plane plane, Airport destinationAirport) {
             this.plane = plane;
             this.destinationAirport = destinationAirport;
-            this.planeTaskThreadPool = planeTaskThreadPool;
+            this.scheduler = Executors.newSingleThreadScheduledExecutor();
         }
-    
+
         @Override
         public void run() {
             plane.takeOff(destinationAirport);
             stats.incrementPlanesInFlight();
             logSubject.onNext("Plane " + plane.getId() + " departing Airport " + plane.getCurrentAirport().getId() + ".");
-    
-            long previousUpdateTime = System.currentTimeMillis();
-    
-            while (plane.getFlightStatus() == FlightStatus.IN_FLIGHT) {
-                long currentTime = System.currentTimeMillis();
-                long deltaTime = currentTime - previousUpdateTime;
-                previousUpdateTime = currentTime;
-    
-                boolean atDestination = plane.updatePosition(deltaTime);  // Access speed inside updatePosition
-                    
-                planeSubject.onNext(plane);  // Update GUI or other observers with the latest position
-    
-                if (atDestination) {
-                    break;
-                }
-    
-                try {
-                    Thread.sleep(PLANE_UPDATE_INTERVAL_MS);  // Pause the loop for a short period
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                    break;
-                }
-            }
-            logSubject.onNext("Plane " + plane.getId() + " arrived at Airport " + plane.getDestinationAirport().getId() + ".");
-            
-            plane.land();
-            stats.decrementPlanesInFlight();
-            stats.incrementCompletedTrips();
-            stats.incrementPlanesUnderService();
 
-            PlaneServicingTask serviceTask = new PlaneServicingTask(plane);
-            planeTaskThreadPool.execute(serviceTask);
+            scheduler.scheduleAtFixedRate(() -> {
+                long deltaTime = PLANE_UPDATE_INTERVAL_MS;
+                boolean atDestination = plane.updatePosition(deltaTime);
+                planeSubject.onNext(plane);
+
+                if (atDestination || plane.getFlightStatus() != FlightStatus.IN_FLIGHT) {
+                    logSubject.onNext("Plane " + plane.getId() + " arrived at Airport " + plane.getDestinationAirport().getId() + ".");
+                    plane.land();
+                    stats.decrementPlanesInFlight();
+                    stats.incrementCompletedTrips();
+                    stats.incrementPlanesUnderService();
+
+                    PlaneServicingTask serviceTask = new PlaneServicingTask(plane);
+                    if (!planeTaskThreadPool.isShutdown()) {
+                        planeTaskThreadPool.execute(serviceTask);
+                    }
+
+                    scheduler.shutdown();
+                }
+            }, 0, PLANE_UPDATE_INTERVAL_MS, TimeUnit.MILLISECONDS);
         }
     }
-    
 
     private class PlaneServicingTask implements Runnable {
-        private Plane plane;
+        private final Plane plane;
 
         public PlaneServicingTask(Plane plane) {
             this.plane = plane;
@@ -115,31 +117,39 @@ public class FlightRequestHandler extends Thread {
 
         @Override
         public void run() {
+            Process proc = null;
+
             try {
-                Process proc = Runtime.getRuntime().exec(
+                proc = Runtime.getRuntime().exec(
                     new String[]{"comms/bin/saed_plane_service", String.valueOf(plane.getCurrentAirport().getId()), String.valueOf(plane.getId())}
                 );
 
-                BufferedReader br = new BufferedReader(new InputStreamReader(proc.getInputStream()));
-                String line;
-                StringBuilder output = new StringBuilder();
+                try (BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(proc.getInputStream()))) {
+                    StringBuilder output = new StringBuilder();
+                    String line;
 
-                while ((line = br.readLine()) != null) {
-                    output.append(line).append("\n");
+                    while ((line = bufferedReader.readLine()) != null) {
+                        output.append(line).append("\n");
+                    }
+
+                    proc.waitFor();
+
+                    logSubject.onNext(output.toString().trim());
+
+                    plane.serviced();
+                    stats.decrementPlanesUnderService();
+                    plane.getCurrentAirport().addAvailablePlane(plane);
                 }
 
-                proc.waitFor();
-
-                logSubject.onNext(output.toString().replace("\n", "")); //Remove new lines
-
-                plane.serviced();
-                stats.decrementPlanesUnderService();
-                plane.getCurrentAirport().addAvailablePlane(plane);
-
             } catch (IOException e) {
-                e.printStackTrace();
+                LOGGER.log(Level.WARNING, () -> e.getMessage());
             } catch (InterruptedException e) {
-                e.printStackTrace();
+                LOGGER.log(Level.WARNING, () -> e.getMessage());
+                currentThread().interrupt();
+            } finally {
+                if (proc != null) {
+                    proc.destroy();
+                }
             }
         }
     }

@@ -1,3 +1,17 @@
+/**
+ * -----------------------------------------------------
+ * GUIManager.java
+ * -----------------------------------------------------
+ * Assignment 1
+ * Software Architecture and Extensible Design - COMP3003
+ * Curtin University
+ * 25/08/2024
+ * -----------------------------------------------------
+ * Harrison Baker
+ * 19514341
+ * -----------------------------------------------------
+ * */
+
 package edu.curtin.saed.assignment1;
 
 import java.util.HashMap;
@@ -5,22 +19,28 @@ import java.util.Map;
 import edu.curtin.saed.assignment1.Plane.FlightStatus;
 import io.reactivex.rxjava3.disposables.CompositeDisposable;
 import javafx.application.Platform;
+import javafx.beans.value.ChangeListener;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
+import javafx.scene.control.ButtonBar;
+import javafx.scene.control.ButtonType;
 import javafx.scene.control.Label;
 import javafx.scene.control.Separator;
 import javafx.scene.control.SplitPane;
 import javafx.scene.control.TextArea;
+import javafx.scene.control.TextField;
 import javafx.scene.control.ToolBar;
 import javafx.scene.image.Image;
 import javafx.scene.layout.BorderPane;
+import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.stage.Stage;
+import javafx.util.Pair;
 import javafx.scene.control.CheckBox;
+import javafx.scene.control.Dialog;
 
-@SuppressWarnings("PMD")
 public class GUIManager {
     private Stage stage;
     private GridArea gridArea;
@@ -32,6 +52,7 @@ public class GUIManager {
     private CompositeDisposable compositeDisposable;
     private Map<Integer, GridAreaIcon> planeIcons;
     private SimulationManager simulationManager;
+    private boolean isSimulationConfigured = false;
 
     public GUIManager(SimulationManager simulationManager, Stage stage) {
         this.simulationManager = simulationManager;
@@ -40,7 +61,6 @@ public class GUIManager {
         compositeDisposable = new CompositeDisposable();
         initComponents();
 
-        // Subscription to subjects
         compositeDisposable.add(simulationManager.getPlaneSubject()
             .subscribe(plane -> Platform.runLater(() -> updatePlane(plane)), Throwable::printStackTrace));
 
@@ -52,8 +72,8 @@ public class GUIManager {
 
         compositeDisposable.add(simulationManager.getStatsSubject()
             .subscribe(stats -> Platform.runLater(() -> updateStatistics(stats)), Throwable::printStackTrace));
-        
-        simulationManager.loadSimulation();
+
+        showInputDialog();
     }
 
     private void initComponents() {
@@ -71,7 +91,14 @@ public class GUIManager {
             gridArea.requestLayout();
         });
 
-        startBtn.setOnAction(event -> startSimulation());
+        startBtn.setOnAction(event -> {
+            if (!isSimulationConfigured) {
+                showInputDialog();
+                return;
+            }
+            startSimulation();
+        });
+
         endBtn.setOnAction(event -> endSimulation());
         stage.setOnCloseRequest(event -> endSimulation());
 
@@ -116,6 +143,7 @@ public class GUIManager {
         startBtn.setDisable(false);
 
         simulationManager.endSimulation();
+        isSimulationConfigured = false;
         dispose();
     }
 
@@ -165,6 +193,101 @@ public class GUIManager {
         statusText.setText("In Flight: " + planesInFlight + 
                            "\tUnder Service: " + planesUnderService + 
                            "\tCompleted Trips: " + completedTrips);
+    }
+
+    private void showInputDialog() {
+        Dialog<Pair<Integer, Pair<Integer, Double>>> dialog = new Dialog<>();
+        
+        // Remove the title and header
+        dialog.setTitle(null);
+        dialog.setHeaderText(null);
+    
+        // Set the OK button type
+        ButtonType loadButton = new ButtonType("Load", ButtonBar.ButtonData.OK_DONE);
+        dialog.getDialogPane().getButtonTypes().add(loadButton);
+        Button loadButtonNode = (Button) dialog.getDialogPane().lookupButton(loadButton);
+        loadButtonNode.setDisable(true); // Disable by default
+    
+        // Create the fields and labels
+        GridPane grid = new GridPane();
+        grid.setHgap(40);
+    
+        TextField airportsField = new TextField();
+        airportsField.setPrefWidth(40);
+        TextField planesPerAirportField = new TextField();
+        planesPerAirportField.setPrefWidth(40);
+        TextField planeSpeedField = new TextField();
+        planeSpeedField.setPrefWidth(40);
+    
+        grid.add(new Label("Airports (2 - 10)"), 0, 0);
+        grid.add(airportsField, 1, 0);
+        grid.add(new Label("Planes Per Airport (1 - 10)"), 0, 1);
+        grid.add(planesPerAirportField, 1, 1);
+        grid.add(new Label("Plane Speed (0.1 - 2.0)"), 0, 2);
+        grid.add(planeSpeedField, 1, 2);
+    
+        dialog.getDialogPane().setContent(grid);
+    
+        // Validation logic
+        ChangeListener<String> validationListener = (observable, oldValue, newValue) -> {
+            try {
+                int airports = Integer.parseInt(airportsField.getText());
+                int planesPerAirport = Integer.parseInt(planesPerAirportField.getText());
+                double speed = Double.parseDouble(planeSpeedField.getText());
+    
+                boolean isValid = airports >= 2 && airports <= 10 &&
+                                  planesPerAirport >= 1 && planesPerAirport <= 10 &&
+                                  speed >= 0.1 && speed <= 2.0;
+    
+                loadButtonNode.setDisable(!isValid);
+            } catch (NumberFormatException e) {
+                loadButtonNode.setDisable(true); // Disable the button if input is invalid
+            }
+        };
+    
+        // Attach validation listener to all input fields
+        airportsField.textProperty().addListener(validationListener);
+        planesPerAirportField.textProperty().addListener(validationListener);
+        planeSpeedField.textProperty().addListener(validationListener);
+    
+        // Convert the result to a pair of inputs when the OK button is clicked
+        dialog.setResultConverter(dialogButton -> {
+            if (dialogButton == loadButton) {
+                return new Pair<>(
+                    Integer.parseInt(airportsField.getText()),
+                    new Pair<>(
+                        Integer.parseInt(planesPerAirportField.getText()),
+                        Double.parseDouble(planeSpeedField.getText())
+                    )
+                );
+            }
+            return null;
+        });
+    
+        // Show the dialog and process the result or use default values if canceled
+        dialog.showAndWait().ifPresentOrElse(result -> {
+            int numAirports = result.getKey();
+            int numPlanesPerAirport = result.getValue().getKey();
+            double planeSpeed = result.getValue().getValue();
+            reset();
+            isSimulationConfigured = true;
+            simulationManager.loadSimulation(numAirports, numPlanesPerAirport, planeSpeed);
+        }, () -> {
+            // Use default values if the dialog is closed with the "X" button or "Cancel"
+            reset();
+            isSimulationConfigured = true;
+            simulationManager.loadSimulation(10, 10, 1.0);
+        });
+    }
+
+    private void reset() {
+        gridArea.getIcons().clear(); 
+        planeIcons.clear();
+
+        messageArea.clear();
+        statusText.setText("In Flight: 0\tUnder Service: 0\tCompleted Trips: 0");
+
+        gridArea.requestLayout();
     }
 
     public void dispose() {
