@@ -10,6 +10,8 @@
  * Harrison Baker
  * 19514341
  * -----------------------------------------------------
+ * Constantly running thread to generate flight requests
+ * for a given airport via a provided external process.
  * */
 
 package edu.curtin.saed.assignment1;
@@ -43,7 +45,7 @@ public class FlightRequestProducer extends Thread {
                 while ((line = bufferedReader.readLine()) != null) {
                     try {
                         int destinationAirportId = Integer.parseInt(line);
-                        airport.addFlightRequest(destinationAirportId + 1);
+                        airport.addFlightRequest(destinationAirportId + 1); //Add a flight request to airports blocking queue.
                     } catch (NumberFormatException e) {
                         LOGGER.log(Level.WARNING, () -> "FlightRequestProducer " + airport.getId() + " NumberFormatException.");
                     }

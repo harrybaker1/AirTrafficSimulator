@@ -10,6 +10,8 @@
  * Harrison Baker
  * 19514341
  * -----------------------------------------------------
+ * Runnable to simulate a plane in flight, handles take
+ * off, periodic updating of coordinates and landing.
  * */
 
 package edu.curtin.saed.assignment1;
@@ -40,11 +42,12 @@ public class PlaneFlyingTask implements Runnable {
 
             logSubject.onNext("Plane " + plane.getId() + " departing Airport " + plane.getCurrentAirport().getId() + ".");
 
-            while (!Thread.currentThread().isInterrupted()) {
+            while (!Thread.currentThread().isInterrupted()) { //Loop until at destination or thread is interrupted.
                 long deltaTime = PLANE_UPDATE_INTERVAL_MS;
                 boolean atDestination = plane.updatePosition(deltaTime);
                 planeSubject.onNext(plane);
 
+                //Arrived at destination.
                 if (atDestination || plane.getFlightStatus() != Plane.FlightStatus.IN_FLIGHT) {
                     logSubject.onNext("Plane " + plane.getId() + " arrived at Airport " + plane.getDestinationAirport().getId() + ".");
                     
@@ -52,11 +55,13 @@ public class PlaneFlyingTask implements Runnable {
                     simulationManager.decrementPlanesInFlight();
                     simulationManager.incrementCompletedTrips();
                     simulationManager.incrementPlanesUnderService();
-                    simulationManager.handlePlaneLanding(plane);
+                    //Service plane.
+                    simulationManager.handleServicing(plane);
 
                     break;
                 }
 
+                //Sleep to simulate plane coordinate update interval.
                 Thread.sleep(PLANE_UPDATE_INTERVAL_MS);
             }
         } catch (InterruptedException e) {

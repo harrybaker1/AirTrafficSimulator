@@ -10,6 +10,9 @@
  * Harrison Baker
  * 19514341
  * -----------------------------------------------------
+ * Runnable to simulate the servicing of a plane after
+ * landing. Runs a provided external process which returns
+ * after a random amount of time indicating completion.
  * */
 
 package edu.curtin.saed.assignment1;
@@ -50,7 +53,7 @@ public class PlaneServicingTask implements Runnable {
                     output.append(line).append("\n");
                 }
 
-                proc.waitFor();
+                proc.waitFor(); //Wait for servicing to finish.
 
                 logSubject.onNext(output.toString().trim());
 
@@ -60,7 +63,8 @@ public class PlaneServicingTask implements Runnable {
             }
 
         } catch (IOException e) {
-            LOGGER.log(Level.WARNING, () -> e.getMessage());
+            LOGGER.log(Level.WARNING, () -> "PlaneServicingTask IOExecption");
+            Thread.currentThread().interrupt();
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         } finally {

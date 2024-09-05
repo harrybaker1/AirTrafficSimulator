@@ -1,5 +1,3 @@
-// WARNING: don't modify this file, unless you're sure you know what you're doing!
-
 package edu.curtin.saed.assignment1;
 
 import java.io.InputStream;

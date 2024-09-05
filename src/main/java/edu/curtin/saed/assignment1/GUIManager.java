@@ -61,8 +61,9 @@ public class GUIManager {
         this.stage = stage;
         planeIcons = new HashMap<>();
         compositeDisposable = new CompositeDisposable();
-        initComponents();
+        initComponents(); //Initalise GUI elements.
 
+        //Set up subscriptions to streams.
         compositeDisposable.add(simulationManager.getPlaneSubject()
             .subscribe(plane -> Platform.runLater(() -> updatePlane(plane)), Throwable::printStackTrace));
 
@@ -75,9 +76,10 @@ public class GUIManager {
         compositeDisposable.add(simulationManager.getStatsSubject()
             .subscribe(stats -> Platform.runLater(() -> updateStatistics(stats)), Throwable::printStackTrace));
 
-        showInputDialog();
+        showInputDialog(); //Show configuration pop up dialog.
     }
 
+    //Double-Checked Locking
     public static GUIManager getInstance(Stage stage) {
         if (instance == null) {
             synchronized (GUIManager.class) {
@@ -99,11 +101,12 @@ public class GUIManager {
 
         gridLinesCheckBox = new CheckBox("Show Grid Lines");
         gridLinesCheckBox.setSelected(true);
-        gridLinesCheckBox.setOnAction(event -> {
+        gridLinesCheckBox.setOnAction(event -> { //Enable/disable grid lines.
             gridArea.setGridLines(gridLinesCheckBox.isSelected());
             gridArea.requestLayout();
         });
 
+        //Start simulation button.
         startBtn.setOnAction(event -> {
             if (!isSimulationConfigured) {
                 showInputDialog();
@@ -112,8 +115,8 @@ public class GUIManager {
             startSimulation();
         });
 
+        //End simulation button.
         endBtn.setOnAction(event -> endSimulation());
-        stage.setOnCloseRequest(event -> endSimulation());
 
         statusText = new Label("In Flight: 0" + 
                            "\tUnder Service: 0" +
@@ -164,6 +167,7 @@ public class GUIManager {
         isSimulationConfigured = false;
     }
 
+    //Update a planes location and direction on GUI.
     private void updatePlane(Plane plane) {
         Platform.runLater(() -> {
             GridAreaIcon icon = planeIcons.get(plane.getId());
@@ -185,6 +189,7 @@ public class GUIManager {
         });
     }
 
+    //Update an airports location on GUI.
     private void updateAirports(Map<Integer, Airport> airports) {
         Platform.runLater(() -> {
             for (Airport airport : airports.values()) {
@@ -198,10 +203,12 @@ public class GUIManager {
         });
     }
 
+    //Add a log to message area.
     public void logMessage(String message) {
         messageArea.appendText(message + "\n");
     }
 
+    //Update statistics values.
     public void updateStatistics(Map<String, Integer> stats) {
         int planesInFlight = stats.getOrDefault("planesInFlight", 0);
         int planesUnderService = stats.getOrDefault("planesUnderService", 0);
@@ -215,17 +222,14 @@ public class GUIManager {
     private void showInputDialog() {
         Dialog<Pair<Integer, Pair<Integer, Double>>> dialog = new Dialog<>();
         
-        // Remove the title and header
         dialog.setTitle(null);
         dialog.setHeaderText(null);
     
-        // Set the OK button type
         ButtonType loadButton = new ButtonType("Load", ButtonBar.ButtonData.OK_DONE);
         dialog.getDialogPane().getButtonTypes().add(loadButton);
-        Button loadButtonNode = (Button) dialog.getDialogPane().lookupButton(loadButton);
-        loadButtonNode.setDisable(true); // Disable by default
+        Button loadButtonN = (Button) dialog.getDialogPane().lookupButton(loadButton);
+        loadButtonN.setDisable(true);
     
-        // Create the fields and labels
         GridPane grid = new GridPane();
         grid.setHgap(40);
     
@@ -245,7 +249,7 @@ public class GUIManager {
     
         dialog.getDialogPane().setContent(grid);
     
-        // Validation logic
+        //Validate airports between 2-10, planes between 1-10, speed between 0.1-2.0.
         ChangeListener<String> validationListener = (observable, oldValue, newValue) -> {
             try {
                 int airports = Integer.parseInt(airportsField.getText());
@@ -256,18 +260,16 @@ public class GUIManager {
                                   planesPerAirport >= 1 && planesPerAirport <= 10 &&
                                   speed >= 0.1 && speed <= 2.0;
     
-                loadButtonNode.setDisable(!isValid);
+                loadButtonN.setDisable(!isValid);
             } catch (NumberFormatException e) {
-                loadButtonNode.setDisable(true); // Disable the button if input is invalid
+                loadButtonN.setDisable(true); //Disable button if input is invalid.
             }
         };
     
-        // Attach validation listener to all input fields
         airportsField.textProperty().addListener(validationListener);
         planesPerAirportField.textProperty().addListener(validationListener);
         planeSpeedField.textProperty().addListener(validationListener);
     
-        // Convert the result to a pair of inputs when the OK button is clicked
         dialog.setResultConverter(dialogButton -> {
             if (dialogButton == loadButton) {
                 return new Pair<>(
@@ -281,7 +283,7 @@ public class GUIManager {
             return null;
         });
     
-        // Show the dialog and process the result or use default values if canceled
+        //Process result or use default values if canceled out.
         dialog.showAndWait().ifPresentOrElse(result -> {
             int numAirports = result.getKey();
             int numPlanesPerAirport = result.getValue().getKey();
@@ -290,13 +292,13 @@ public class GUIManager {
             isSimulationConfigured = true;
             simulationManager.loadSimulation(numAirports, numPlanesPerAirport, planeSpeed);
         }, () -> {
-            // Use default values if the dialog is closed with the "X" button or "Cancel"
             reset();
             isSimulationConfigured = true;
             simulationManager.loadSimulation(10, 10, 1.0);
         });
     }
 
+    //Reset GUI elements.
     private void reset() {
         gridArea.getIcons().clear(); 
         planeIcons.clear();
@@ -307,6 +309,7 @@ public class GUIManager {
         gridArea.requestLayout();
     }
 
+    //Dispose streams.
     public void dispose() {
         if (compositeDisposable != null && !compositeDisposable.isDisposed()) {
             compositeDisposable.dispose();

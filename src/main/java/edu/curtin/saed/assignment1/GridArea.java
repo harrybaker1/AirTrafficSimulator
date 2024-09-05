@@ -1,5 +1,3 @@
-// WARNING: don't modify this file, unless you're sure you know what you're doing!
-
 package edu.curtin.saed.assignment1;
 
 import javafx.geometry.VPos;
@@ -9,26 +7,6 @@ import javafx.scene.paint.Color;
 import javafx.scene.text.TextAlignment;
 import java.util.*;
 
-/**
- * A JavaFX GUI element that implements an automatically-scaling on-screen area, on which you can
- * position captioned icons, represented as GridAreaIcon objects.
- *
- * You can add icons like this:
- *
- * GridArea area = new GridArea(100, 100);
- * area.getIcons().add(new GridAreaIcon(...));
- * area.requestLayout();
- *
- * You can move (or otherwise change) images like this:
- *
- * GridAreaIcon icon = ...;
- * icon.setPosition(5.0, 6.0);
- * icon.setRotation(45.0);     // Degrees
- * area.requestLayout();
- *
- * Remember to call area.requestLayout() to ask the GUI to redraw the panel after you've modified
- * something. If you're making several changes at once, only call it once at the end.
- */
 public class GridArea extends Pane
 {
     private double gridWidth;

@@ -14,7 +14,6 @@
 
 package edu.curtin.saed.assignment1;
 
-@SuppressWarnings("PMD")
 public class Plane {
     private int id;
     private double xCoord;
@@ -71,10 +70,11 @@ public class Plane {
                 angleDegrees += 360;
             }
 
-            direction = angleDegrees + 45;  // Adjusting with an offset of 45 degrees if needed
+            direction = angleDegrees + 45;  //Offset 45 degrees
         }
     }
 
+    //Reference: https://www.khanacademy.org/math/algebra-home/alg-system-of-equations/alg-equivalent-systems-of-equations/v/solving-systems-of-equations-by-elimination
     public boolean updatePosition(double deltaTime) {
         synchronized (lock) {
             if (flightStatus != FlightStatus.IN_FLIGHT || destinationAirport == null) {
@@ -88,6 +88,7 @@ public class Plane {
 
             double distance = Math.hypot(dx, dy);
 
+            //Close enough to location therefore return true for at location.
             if (distance <= speed * deltaTimeInSeconds) {
                 xCoord = destinationAirport.getXCoord();
                 yCoord = destinationAirport.getYCoord();

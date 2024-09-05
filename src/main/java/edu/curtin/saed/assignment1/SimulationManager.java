@@ -10,6 +10,7 @@
  * Harrison Baker
  * 19514341
  * -----------------------------------------------------
+ * Core simulation manager.
  * */
 
 package edu.curtin.saed.assignment1;
@@ -46,6 +47,7 @@ public class SimulationManager {
     private Subject<String> logSubject;
     private Subject<Map<String, Integer>> statsSubject;
     private boolean isRunning;
+    //AtomicIntegers for thread safety.
     private final AtomicInteger planesInFlight = new AtomicInteger(0);
     private final AtomicInteger planesUnderService = new AtomicInteger(0);
     private final AtomicInteger completedTrips = new AtomicInteger(0);
@@ -54,12 +56,14 @@ public class SimulationManager {
         this.isRunning = false;
         this.flightRequestProducerThreads = new ArrayList<>();
         this.flightRequestHandlerThreads = new ArrayList<>();
+        //Create serialized subjects for thread safety.
         this.planeSubject = PublishSubject.<Plane>create().toSerialized();
         this.airportListSubject = PublishSubject.<Map<Integer, Airport>>create().toSerialized();
         this.logSubject = PublishSubject.<String>create().toSerialized();
         this.statsSubject = PublishSubject.<Map<String, Integer>>create().toSerialized();
     }
 
+    //Double-Checked Locking
     public static SimulationManager getInstance() {
         if (instance == null) {
             synchronized (SimulationManager.class) {
@@ -71,6 +75,7 @@ public class SimulationManager {
         return instance;
     }
 
+    //Reset and load a new simulation.
     public void loadSimulation(int numAirports, int numPlanesPerAirport, double planeSpeed) {
         reset();
         this.numAirports = numAirports;
@@ -92,18 +97,18 @@ public class SimulationManager {
             boolean validPosition;
     
             do {
-                // Choose a random cell
+                //Choose a random cell.
                 int cellX = (int) (Math.random() * gridSize);
                 int cellY = (int) (Math.random() * gridSize);
     
-                // Generate random position within the chosen cell
+                //Generate random position in the cell.
                 xCoord = cellX * cellWidth + Math.random() * (Math.min(cellWidth, MAP_WIDTH - cellX * cellWidth));
                 yCoord = cellY * cellHeight + Math.random() * (Math.min(cellHeight, MAP_HEIGHT - cellY * cellHeight));
 
     
                 validPosition = true;
     
-                // Check if this position is far enough from existing airports
+                //Check far enough from existing airports
                 for (Airport existingAirport : airports.values()) {
                     double distance = Math.hypot(xCoord - existingAirport.getXCoord(), yCoord - existingAirport.getYCoord());
                     if (distance < MIN_DIST_BETWEEN_AIPORTS) {
@@ -120,7 +125,7 @@ public class SimulationManager {
 
     private void initPlanes(double planeSpeed) {
         planes = new ConcurrentHashMap<>();
-        int planeId = 1;
+        int planeId = 1; //Starting id.
     
         for (Airport airport : airports.values()) {
             for (int i = 0; i < numPlanesPerAirport; i++) {
@@ -132,6 +137,7 @@ public class SimulationManager {
         }
     }
 
+    //Create FlightRequestProducer & FlightRequestHandler threads for each airport.
     private void initFlightRequestThreads() {
         for (Airport airport : airports.values()) {
             FlightRequestProducer flightRequestProducer = new FlightRequestProducer(airport, numAirports);
@@ -142,6 +148,7 @@ public class SimulationManager {
         }
     }
 
+    //Start FlightRequestProducer & FlightRequestHandler threads for each airport.
     public void startSimulation() {
         if (!isRunning) {
             isRunning = true;
@@ -155,6 +162,7 @@ public class SimulationManager {
         }
     }
     
+    //End FlightRequestProducer & FlightRequestHandler threads for each airport and shutdown thread pool.
     public void endSimulation() {
         if (isRunning) {
             isRunning = false;
@@ -170,6 +178,7 @@ public class SimulationManager {
         }
     }
 
+    //Reset all simulation values, interrupt all threads and shutdown thread pool.
     public void reset() {
         if (planeTaskThreadPool != null && !planeTaskThreadPool.isShutdown()) {
             planeTaskThreadPool.shutdownNow();
@@ -234,7 +243,8 @@ public class SimulationManager {
         return statsSubject;
     }
 
-    public void handlePlaneLanding(Plane plane) {
+    //Start a service task for a plane.
+    public void handleServicing(Plane plane) {
         PlaneServicingTask servicingTask = new PlaneServicingTask(plane);
         if (!planeTaskThreadPool.isShutdown()) {
             planeTaskThreadPool.execute(servicingTask);
