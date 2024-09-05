@@ -123,6 +123,11 @@ public class GUIManager {
         contentPane.setTop(toolbar);
         contentPane.setCenter(splitPane);
 
+        stage.setOnCloseRequest(event -> {
+            endSimulation();
+            dispose();
+        });
+
         Scene scene = new Scene(contentPane, 1000, 1000);
         stage.setTitle("Air Traffic Simulator");
         Image icon = new Image(App.class.getClassLoader().getResourceAsStream("airport.png"));
@@ -144,7 +149,6 @@ public class GUIManager {
 
         simulationManager.endSimulation();
         isSimulationConfigured = false;
-        dispose();
     }
 
     private void updatePlane(Plane plane) {

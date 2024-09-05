@@ -45,34 +45,30 @@ public class FlightRequestProducer extends Thread {
                         int destinationAirportId = Integer.parseInt(line);
                         airport.addFlightRequest(destinationAirportId + 1);
                     } catch (NumberFormatException e) {
-                        LOGGER.log(Level.WARNING, () -> "Failed to parse destination airport ID: " + e.getMessage());
+                        LOGGER.log(Level.WARNING, () -> "FlightRequestProducer " + airport.getId() + " NumberFormatException.");
                     }
                 }
             }
         } catch (IOException e) {
-            LOGGER.log(Level.WARNING, () -> "IOException occurred: " + e.getMessage());
+            LOGGER.log(Level.WARNING, () -> "FlightRequestProducer " + airport.getId() + " IOException.");
+            currentThread().interrupt();
         } finally {
             if (process != null) {
                 process.destroy();
                 try {
-                    process.waitFor(); // Ensure the process terminates
+                    process.waitFor();
                 } catch (InterruptedException e) {
-                    LOGGER.log(Level.WARNING, () -> "Process was interrupted: " + e.getMessage());
-                    currentThread().interrupt(); // Handle the interruption
+                    currentThread().interrupt();
                 }
             }
         }
     }
 
-    public void endProcess() {
+    @Override
+    public void interrupt() {
         if (process != null) {
             process.destroy();
-            try {
-                process.waitFor(); // Ensure the process terminates
-            } catch (InterruptedException e) {
-                LOGGER.log(Level.WARNING, () -> "Process was interrupted during endProcess: " + e.getMessage());
-                currentThread().interrupt(); // Handle the interruption
-            }
         }
+        super.interrupt();
     }
 }

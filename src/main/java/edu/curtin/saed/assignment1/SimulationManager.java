@@ -131,10 +131,10 @@ public class SimulationManager implements SimulationStatistics{
         if (!isRunning) {
             isRunning = true;
 
-            for (Thread thread : flightRequestProducerThreads) {
+            for (Thread thread : flightRequestHandlerThreads) {
                 thread.start();
             }
-            for (Thread thread : flightRequestHandlerThreads) {
+            for (Thread thread : flightRequestProducerThreads) {
                 thread.start();
             }
         }
@@ -145,7 +145,6 @@ public class SimulationManager implements SimulationStatistics{
             isRunning = false;
 
             for (FlightRequestProducer producerThread : flightRequestProducerThreads) {
-                producerThread.endProcess();
                 producerThread.interrupt();
             }
             for (FlightRequestHandler handlerThread : flightRequestHandlerThreads) {
