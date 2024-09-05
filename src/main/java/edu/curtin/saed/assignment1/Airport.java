@@ -64,5 +64,4 @@ public class Airport {
     public int getFlightRequest() throws InterruptedException {
         return flightRequests.take();
     }
-
 }

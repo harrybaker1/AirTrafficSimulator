@@ -12,47 +12,42 @@
  * -----------------------------------------------------
  * */
 
-package edu.curtin.saed.assignment1;
+ package edu.curtin.saed.assignment1;
 
-import java.util.Map;
-import java.util.concurrent.ThreadPoolExecutor;
-import io.reactivex.rxjava3.subjects.PublishSubject;
-
-public class FlightRequestHandler extends Thread {
-    private Airport airport;
-    private Map<Integer, Airport> allAirports;
-    private ThreadPoolExecutor planeTaskThreadPool;
-    private PublishSubject<Plane> planeSubject;
-    private PublishSubject<String> logSubject;
-    private SimulationStatistics stats;
-
-    public FlightRequestHandler(Airport airport, Map<Integer, Airport> allAirports, ThreadPoolExecutor planeTaskThreadPool, PublishSubject<Plane> planeSubject, PublishSubject<String> logSubject, SimulationStatistics stats) {
-        this.airport = airport;
-        this.allAirports = allAirports;
-        this.planeTaskThreadPool = planeTaskThreadPool;
-        this.planeSubject = planeSubject;
-        this.logSubject = logSubject;
-        this.stats = stats;
-    }
-
-    @Override
-    public void run() {
+ import java.util.Map;
+ 
+ public class FlightRequestHandler extends Thread {
+     private Airport airport;
+     private Map<Integer, Airport> allAirports;
+     private SimulationManager simulationManager;
+ 
+     public FlightRequestHandler(Airport airport, Map<Integer, Airport> allAirports) {
+         this.airport = airport;
+         this.allAirports = allAirports;
+         this.simulationManager = SimulationManager.getInstance();
+     }
+ 
+     @Override
+     public void run() {
         try {
-            while (!currentThread().isInterrupted()) {
+            while (true) {
                 int destinationAirportId = airport.getFlightRequest();
                 Airport destinationAirport = getAirportById(destinationAirportId);
                 Plane plane = airport.getAvailablePlane();
-                PlaneFlyingTask movementTask = new PlaneFlyingTask(plane, destinationAirport, stats, planeSubject, logSubject, planeTaskThreadPool);
-                if (!planeTaskThreadPool.isShutdown()) {
-                    planeTaskThreadPool.execute(movementTask);
+    
+                PlaneFlyingTask movementTask = new PlaneFlyingTask(plane, destinationAirport);
+    
+                if (!simulationManager.getPlaneTaskThreadPool().isShutdown()) {
+                    simulationManager.getPlaneTaskThreadPool().execute(movementTask);
                 }
             }
         } catch (InterruptedException e) {
             currentThread().interrupt();
         }
     }
-
-    private Airport getAirportById(int airportId) {
-        return allAirports.getOrDefault(airportId, null);
-    }
-}
+ 
+     private Airport getAirportById(int airportId) {
+         return allAirports.getOrDefault(airportId, null);
+     }
+ }
+ 

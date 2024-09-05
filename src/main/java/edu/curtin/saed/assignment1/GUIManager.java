@@ -42,6 +42,8 @@ import javafx.scene.control.CheckBox;
 import javafx.scene.control.Dialog;
 
 public class GUIManager {
+    private static GUIManager instance;
+
     private Stage stage;
     private GridArea gridArea;
     private Label statusText;
@@ -54,8 +56,8 @@ public class GUIManager {
     private SimulationManager simulationManager;
     private boolean isSimulationConfigured = false;
 
-    public GUIManager(SimulationManager simulationManager, Stage stage) {
-        this.simulationManager = simulationManager;
+    private GUIManager(Stage stage) {
+        this.simulationManager = SimulationManager.getInstance();
         this.stage = stage;
         planeIcons = new HashMap<>();
         compositeDisposable = new CompositeDisposable();
@@ -74,6 +76,17 @@ public class GUIManager {
             .subscribe(stats -> Platform.runLater(() -> updateStatistics(stats)), Throwable::printStackTrace));
 
         showInputDialog();
+    }
+
+    public static GUIManager getInstance(Stage stage) {
+        if (instance == null) {
+            synchronized (GUIManager.class) {
+                if (instance == null) {
+                    instance = new GUIManager(stage);
+                }
+            }
+        }
+        return instance;
     }
 
     private void initComponents() {

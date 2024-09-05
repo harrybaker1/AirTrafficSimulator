@@ -27,6 +27,8 @@ public class App extends Application
     @Override
     public void start(Stage stage)
     {
-        new GUIManager(new SimulationManager(), stage);
+        SimulationManager.getInstance();
+        
+        GUIManager.getInstance(stage);
     }
 }

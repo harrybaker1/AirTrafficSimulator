@@ -1,32 +1,43 @@
+/**
+ * -----------------------------------------------------
+ * PlaneFlyingTask.java
+ * -----------------------------------------------------
+ * Assignment 1
+ * Software Architecture and Extensible Design - COMP3003
+ * Curtin University
+ * 25/08/2024
+ * -----------------------------------------------------
+ * Harrison Baker
+ * 19514341
+ * -----------------------------------------------------
+ * */
+
 package edu.curtin.saed.assignment1;
 
-import java.util.concurrent.ThreadPoolExecutor;
-
-import io.reactivex.rxjava3.subjects.PublishSubject;
+import io.reactivex.rxjava3.subjects.Subject;
 
 public class PlaneFlyingTask implements Runnable {
     private static final long PLANE_UPDATE_INTERVAL_MS = 50;
     private Plane plane;
     private Airport destinationAirport;
-    private SimulationStatistics stats;
-    private PublishSubject<Plane> planeSubject;
-    private PublishSubject<String> logSubject;
-    private ThreadPoolExecutor planeTaskThreadPool;
+    private SimulationManager simulationManager;
+    private Subject<Plane> planeSubject;
+    private Subject<String> logSubject;
 
-    public PlaneFlyingTask(Plane plane, Airport destinationAirport, SimulationStatistics stats, PublishSubject<Plane> planeSubject, PublishSubject<String> logSubject, ThreadPoolExecutor planeTaskThreadPool) {
+    public PlaneFlyingTask(Plane plane, Airport destinationAirport) {
         this.plane = plane;
         this.destinationAirport = destinationAirport;
-        this.stats = stats;
-        this.planeSubject = planeSubject;
-        this.logSubject = logSubject;
-        this.planeTaskThreadPool = planeTaskThreadPool;
+        this.simulationManager = SimulationManager.getInstance();
+        this.planeSubject = simulationManager.getPlaneSubject();
+        this.logSubject = simulationManager.getLogSubject();
     }
 
     @Override
     public void run() {
         try {
             plane.takeOff(destinationAirport);
-            stats.incrementPlanesInFlight();
+            simulationManager.incrementPlanesInFlight();
+
             logSubject.onNext("Plane " + plane.getId() + " departing Airport " + plane.getCurrentAirport().getId() + ".");
 
             while (!Thread.currentThread().isInterrupted()) {
@@ -36,15 +47,13 @@ public class PlaneFlyingTask implements Runnable {
 
                 if (atDestination || plane.getFlightStatus() != Plane.FlightStatus.IN_FLIGHT) {
                     logSubject.onNext("Plane " + plane.getId() + " arrived at Airport " + plane.getDestinationAirport().getId() + ".");
+                    
                     plane.land();
-                    stats.decrementPlanesInFlight();
-                    stats.incrementCompletedTrips();
-                    stats.incrementPlanesUnderService();
+                    simulationManager.decrementPlanesInFlight();
+                    simulationManager.incrementCompletedTrips();
+                    simulationManager.incrementPlanesUnderService();
+                    simulationManager.handlePlaneLanding(plane);
 
-                    PlaneServicingTask serviceTask = new PlaneServicingTask(plane, stats, logSubject);
-                    if (!planeTaskThreadPool.isShutdown()) {
-                        planeTaskThreadPool.execute(serviceTask);
-                    }
                     break;
                 }
 

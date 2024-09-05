@@ -25,12 +25,15 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import edu.curtin.saed.assignment1.Plane.FlightStatus;
 import io.reactivex.rxjava3.subjects.PublishSubject;
+import io.reactivex.rxjava3.subjects.Subject;
 
-public class SimulationManager implements SimulationStatistics{
+public class SimulationManager {
+    private static SimulationManager instance;
+
     public static final int MAP_WIDTH = 10;
     public static final int MAP_HEIGHT = 10;
-    private static final double MIN_DIST_BETWEEN_AIPORTS = 1.5;
     public static final int FLIGHT_REQUEST_QUEUE_LIMIT = 50;
+    private static final double MIN_DIST_BETWEEN_AIPORTS = 1.5;
     private Map<Integer, Airport> airports;
     private Map<Integer, Plane> planes;
     private int numAirports;
@@ -38,23 +41,34 @@ public class SimulationManager implements SimulationStatistics{
     private ThreadPoolExecutor planeTaskThreadPool;
     private List<FlightRequestProducer> flightRequestProducerThreads;
     private List<FlightRequestHandler> flightRequestHandlerThreads;
-    private PublishSubject<Plane> planeSubject;
-    private PublishSubject<Map<Integer, Airport>> airportListSubject;
-    private PublishSubject<String> logSubject;
-    private PublishSubject<Map<String, Integer>> statsSubject;
+    private Subject<Plane> planeSubject;
+    private Subject<Map<Integer, Airport>> airportListSubject; 
+    private Subject<String> logSubject;
+    private Subject<Map<String, Integer>> statsSubject;
     private boolean isRunning;
     private final AtomicInteger planesInFlight = new AtomicInteger(0);
     private final AtomicInteger planesUnderService = new AtomicInteger(0);
     private final AtomicInteger completedTrips = new AtomicInteger(0);
 
-    public SimulationManager() {
+    private SimulationManager() {
         this.isRunning = false;
         this.flightRequestProducerThreads = new ArrayList<>();
         this.flightRequestHandlerThreads = new ArrayList<>();
-        this.planeSubject = PublishSubject.create();
-        this.airportListSubject = PublishSubject.create();
-        this.logSubject = PublishSubject.create();
-        this.statsSubject = PublishSubject.create();
+        this.planeSubject = PublishSubject.<Plane>create().toSerialized();
+        this.airportListSubject = PublishSubject.<Map<Integer, Airport>>create().toSerialized();
+        this.logSubject = PublishSubject.<String>create().toSerialized();
+        this.statsSubject = PublishSubject.<Map<String, Integer>>create().toSerialized();
+    }
+
+    public static SimulationManager getInstance() {
+        if (instance == null) {
+            synchronized (SimulationManager.class) {
+                if (instance == null) {
+                    instance = new SimulationManager();
+                }
+            }
+        }
+        return instance;
     }
 
     public void loadSimulation(int numAirports, int numPlanesPerAirport, double planeSpeed) {
@@ -83,8 +97,9 @@ public class SimulationManager implements SimulationStatistics{
                 int cellY = (int) (Math.random() * gridSize);
     
                 // Generate random position within the chosen cell
-                xCoord = Math.min(cellX * cellWidth + Math.random() * cellWidth, 9.0);
-                yCoord = Math.min(cellY * cellHeight + Math.random() * cellHeight, 9.0);
+                xCoord = cellX * cellWidth + Math.random() * (Math.min(cellWidth, MAP_WIDTH - cellX * cellWidth));
+                yCoord = cellY * cellHeight + Math.random() * (Math.min(cellHeight, MAP_HEIGHT - cellY * cellHeight));
+
     
                 validPosition = true;
     
@@ -120,7 +135,7 @@ public class SimulationManager implements SimulationStatistics{
     private void initFlightRequestThreads() {
         for (Airport airport : airports.values()) {
             FlightRequestProducer flightRequestProducer = new FlightRequestProducer(airport, numAirports);
-            FlightRequestHandler flightRequestHandler = new FlightRequestHandler(airport, airports, planeTaskThreadPool, planeSubject, logSubject, this);
+            FlightRequestHandler flightRequestHandler = new FlightRequestHandler(airport, airports);
     
             flightRequestProducerThreads.add(flightRequestProducer);
             flightRequestHandlerThreads.add(flightRequestHandler);
@@ -199,21 +214,31 @@ public class SimulationManager implements SimulationStatistics{
         isRunning = false;
     }
     
-    
-    public PublishSubject<Plane> getPlaneSubject() {
+    public ThreadPoolExecutor getPlaneTaskThreadPool() {
+        return planeTaskThreadPool;
+    }
+
+    public Subject<Plane> getPlaneSubject() {
         return planeSubject;
     }
     
-    public PublishSubject<Map<Integer, Airport>> getAirportListSubject() {
+    public Subject<Map<Integer, Airport>> getAirportListSubject() {
         return airportListSubject;
     }
 
-    public PublishSubject<String> getLogSubject() {
+    public Subject<String> getLogSubject() {
         return logSubject;
     }
 
-    public PublishSubject<Map<String, Integer>> getStatsSubject() {
+    public Subject<Map<String, Integer>> getStatsSubject() {
         return statsSubject;
+    }
+
+    public void handlePlaneLanding(Plane plane) {
+        PlaneServicingTask servicingTask = new PlaneServicingTask(plane);
+        if (!planeTaskThreadPool.isShutdown()) {
+            planeTaskThreadPool.execute(servicingTask);
+        }
     }
 
     private void emitStats() {
@@ -224,31 +249,26 @@ public class SimulationManager implements SimulationStatistics{
         statsSubject.onNext(stats);
     }
 
-    @Override
     public void incrementPlanesInFlight() {
         planesInFlight.incrementAndGet();
         emitStats();
     }
 
-    @Override
     public void decrementPlanesInFlight() {
         planesInFlight.decrementAndGet();
         emitStats();
     }
 
-    @Override
     public void incrementPlanesUnderService() {
         planesUnderService.incrementAndGet();
         emitStats();
     }
 
-    @Override
     public void decrementPlanesUnderService() {
         planesUnderService.decrementAndGet();
         emitStats();
     }
 
-    @Override
     public void incrementCompletedTrips() {
         completedTrips.incrementAndGet();
         emitStats();

@@ -1,3 +1,17 @@
+/**
+ * -----------------------------------------------------
+ * PlaneServicingTask.java
+ * -----------------------------------------------------
+ * Assignment 1
+ * Software Architecture and Extensible Design - COMP3003
+ * Curtin University
+ * 25/08/2024
+ * -----------------------------------------------------
+ * Harrison Baker
+ * 19514341
+ * -----------------------------------------------------
+ * */
+
 package edu.curtin.saed.assignment1;
 
 import java.io.BufferedReader;
@@ -5,18 +19,18 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import io.reactivex.rxjava3.subjects.PublishSubject;
+import io.reactivex.rxjava3.subjects.Subject;
 
 public class PlaneServicingTask implements Runnable {
     private static final Logger LOGGER = Logger.getLogger(PlaneServicingTask.class.getName());
     private final Plane plane;
-    private SimulationStatistics stats;
-    private PublishSubject<String> logSubject;
+    private SimulationManager simulationManager;
+    private Subject<String> logSubject;
 
-    public PlaneServicingTask(Plane plane, SimulationStatistics stats, PublishSubject<String> logSubject) {
+    public PlaneServicingTask(Plane plane) {
         this.plane = plane;
-        this.stats = stats;
-        this.logSubject = logSubject;
+        this.simulationManager = SimulationManager.getInstance();
+        this.logSubject = simulationManager.getLogSubject();
     }
 
     @Override
@@ -41,7 +55,7 @@ public class PlaneServicingTask implements Runnable {
                 logSubject.onNext(output.toString().trim());
 
                 plane.serviced();
-                stats.decrementPlanesUnderService();
+                simulationManager.decrementPlanesUnderService();
                 plane.getCurrentAirport().addAvailablePlane(plane);
             }
 
