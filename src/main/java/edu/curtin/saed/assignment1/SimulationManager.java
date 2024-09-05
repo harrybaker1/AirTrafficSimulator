@@ -24,7 +24,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import edu.curtin.saed.assignment1.Plane.FlightStatus;
 import io.reactivex.rxjava3.subjects.PublishSubject;
 import io.reactivex.rxjava3.subjects.Subject;
 
@@ -129,7 +128,7 @@ public class SimulationManager {
     
         for (Airport airport : airports.values()) {
             for (int i = 0; i < numPlanesPerAirport; i++) {
-                Plane plane = new Plane(planeId++, airport.getXCoord(), airport.getYCoord(), planeSpeed, airport, FlightStatus.READY);
+                Plane plane = new Plane(planeId++, airport.getXCoord(), airport.getYCoord(), planeSpeed, airport);
                 planes.put(plane.getId(), plane);
                 airport.addAvailablePlane(plane);
                 planeSubject.onNext(plane);

@@ -25,7 +25,7 @@ public class Plane {
     private FlightStatus flightStatus;
     private final Object lock = new Object();
 
-    public Plane(int id, double xCoord, double yCoord, double speed, Airport currentAirport, FlightStatus flightStatus) {
+    public Plane(int id, double xCoord, double yCoord, double speed, Airport currentAirport) {
         this.id = id;
         this.xCoord = xCoord;
         this.yCoord = yCoord;
@@ -133,7 +133,7 @@ public class Plane {
         return flightStatus;
     }
 
-    enum FlightStatus {
+    public enum FlightStatus {
         IN_FLIGHT,
         READY,
         UNDER_SERVICE
