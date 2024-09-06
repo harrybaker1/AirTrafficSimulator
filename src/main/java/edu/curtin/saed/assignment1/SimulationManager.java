@@ -33,7 +33,7 @@ public class SimulationManager {
     public static final int MAP_WIDTH = 10;
     public static final int MAP_HEIGHT = 10;
     public static final int FLIGHT_REQUEST_QUEUE_LIMIT = 50;
-    private static final double MIN_DIST_BETWEEN_AIPORTS = 1.5;
+    private static final double MIN_DIST_BETWEEN_AIRPORTS = 1.5;
     private Map<Integer, Airport> airports;
     private Map<Integer, Plane> planes;
     private int numAirports;
@@ -110,7 +110,7 @@ public class SimulationManager {
                 //Check far enough from existing airports
                 for (Airport existingAirport : airports.values()) {
                     double distance = Math.hypot(xCoord - existingAirport.getXCoord(), yCoord - existingAirport.getYCoord());
-                    if (distance < MIN_DIST_BETWEEN_AIPORTS) {
+                    if (distance < MIN_DIST_BETWEEN_AIRPORTS) {
                         validPosition = false;
                         break;
                     }

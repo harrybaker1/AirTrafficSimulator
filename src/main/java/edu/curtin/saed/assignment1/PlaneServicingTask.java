@@ -63,7 +63,7 @@ public class PlaneServicingTask implements Runnable {
             }
 
         } catch (IOException e) {
-            LOGGER.log(Level.WARNING, () -> "PlaneServicingTask IOExecption");
+            LOGGER.log(Level.WARNING, () -> "PlaneServicingTask IOException");
             Thread.currentThread().interrupt();
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();

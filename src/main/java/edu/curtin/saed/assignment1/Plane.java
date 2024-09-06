@@ -40,7 +40,7 @@ public class Plane {
         synchronized (lock) {
             this.destinationAirport = destinationAirport;
             this.flightStatus = FlightStatus.IN_FLIGHT;
-            calculateDirection();
+            setDirection();
         }
     }
 
@@ -59,7 +59,7 @@ public class Plane {
         }
     }
 
-    private void calculateDirection() {
+    private void setDirection() {
         if (destinationAirport != null) {
             double dx = destinationAirport.getXCoord() - xCoord;
             double dy = destinationAirport.getYCoord() - yCoord;
