@@ -23,7 +23,8 @@ public class Plane {
     private Airport currentAirport;
     private Airport destinationAirport;
     private FlightStatus flightStatus;
-    private final Object lock = new Object();
+    private final Object statusLock = new Object();
+    private final Object positionLock = new Object();
 
     public Plane(int id, double xCoord, double yCoord, double speed, Airport currentAirport) {
         this.id = id;
@@ -37,7 +38,7 @@ public class Plane {
     }
 
     public void takeOff(Airport destinationAirport) {
-        synchronized (lock) {
+        synchronized (statusLock) {
             this.destinationAirport = destinationAirport;
             this.flightStatus = FlightStatus.IN_FLIGHT;
             setDirection();
@@ -45,7 +46,7 @@ public class Plane {
     }
 
     public void land() {
-        synchronized (lock) {
+        synchronized (statusLock) {
             this.currentAirport = destinationAirport;
             this.destinationAirport = null;
             this.flightStatus = FlightStatus.UNDER_SERVICE;
@@ -54,7 +55,7 @@ public class Plane {
     }
 
     public void serviced() {
-        synchronized (lock) {
+        synchronized (statusLock) {
             flightStatus = FlightStatus.READY;
         }
     }
@@ -76,33 +77,33 @@ public class Plane {
 
     //Reference: https://www.khanacademy.org/math/algebra-home/alg-system-of-equations/alg-equivalent-systems-of-equations/v/solving-systems-of-equations-by-elimination
     public boolean updatePosition(double deltaTime) {
-        synchronized (lock) {
-            if (flightStatus != FlightStatus.IN_FLIGHT || destinationAirport == null) {
-                return false;
-            }
-
-            double deltaTimeInSeconds = deltaTime / 1000.0;
-
-            double dx = destinationAirport.getXCoord() - xCoord;
-            double dy = destinationAirport.getYCoord() - yCoord;
-
-            double distance = Math.hypot(dx, dy);
-
-            //Close enough to location therefore return true for at location.
-            if (distance <= speed * deltaTimeInSeconds) {
-                xCoord = destinationAirport.getXCoord();
-                yCoord = destinationAirport.getYCoord();
-                return true;
-            }
-
-            double directionX = dx / distance;
-            double directionY = dy / distance;
-
-            xCoord += directionX * speed * deltaTimeInSeconds;
-            yCoord += directionY * speed * deltaTimeInSeconds;
-
+        if (flightStatus != FlightStatus.IN_FLIGHT || destinationAirport == null) {
             return false;
         }
+
+        double deltaTimeInSeconds = deltaTime / 1000.0;
+
+        double dx = destinationAirport.getXCoord() - xCoord;
+        double dy = destinationAirport.getYCoord() - yCoord;
+
+        double distance = Math.hypot(dx, dy);
+
+        //Close enough to location therefore return true for at location.
+        if (distance <= speed * deltaTimeInSeconds) {
+            xCoord = destinationAirport.getXCoord();
+            yCoord = destinationAirport.getYCoord();
+            return true;
+        }
+
+        double directionX = dx / distance;
+        double directionY = dy / distance;
+
+        synchronized (positionLock) {
+            xCoord += directionX * speed * deltaTimeInSeconds;
+            yCoord += directionY * speed * deltaTimeInSeconds;
+        }
+
+        return false;
     }
 
     public int getId() {
