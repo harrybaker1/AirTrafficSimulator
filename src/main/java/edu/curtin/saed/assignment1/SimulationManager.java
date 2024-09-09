@@ -46,7 +46,6 @@ public class SimulationManager {
     private Subject<String> logSubject;
     private Subject<Map<String, Integer>> statsSubject;
     private boolean isRunning;
-    //AtomicIntegers for thread safety.
     private final AtomicInteger planesInFlight = new AtomicInteger(0);
     private final AtomicInteger planesUnderService = new AtomicInteger(0);
     private final AtomicInteger completedTrips = new AtomicInteger(0);
